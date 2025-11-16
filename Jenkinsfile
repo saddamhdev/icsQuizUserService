@@ -42,28 +42,29 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c \
-                    "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${PROD_HOST} '
-                        cd ${REMOTE_DIR};
+                    "C:/Program Files/Git/bin/bash.exe" -c "
+                    ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${PROD_HOST} \\
+                    \\"cd ${REMOTE_DIR}; \\
+                    echo '--- Building Docker Image ---'; \\
+                    docker build -t ${IMAGE_NAME} .; \\
 
-                        echo \"-- Building Docker image --\";
-                        docker build -t ${IMAGE_NAME} .;
+                    echo '--- Stop Previous Container ---'; \\
+                    docker stop ${DOCKER_APP} || true; \\
+                    docker rm ${DOCKER_APP} || true; \\
 
-                        echo \"-- Stopping Old Container --\";
-                        docker stop ${DOCKER_APP} || true;
-                        docker rm ${DOCKER_APP} || true;
-
-                        echo \"-- Starting New Container --\";
-                        docker run -d \\
-                            --name ${DOCKER_APP} \\
-                            -p ${SPRING_PORT}:3090 \\
-                            --restart unless-stopped \\
-                            ${IMAGE_NAME};
-                    '"
+                    echo '--- Start New Container ---'; \\
+                    docker run -d \\
+                        --name ${DOCKER_APP} \\
+                        -p ${SPRING_PORT}:3090 \\
+                        --restart unless-stopped \\
+                        ${IMAGE_NAME};
+                    \\"
+                    "
                     """
                 }
             }
         }
+
 
     }
 
