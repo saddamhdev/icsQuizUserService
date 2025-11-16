@@ -2,52 +2,48 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME     = "icsquiz-user-service"
-        IMAGE_NAME   = "icsquiz-user-service:latest"
-        REMOTE_DIR   = "/www/wwwroot/CITSNVN/icsQuizUserService"
-        DOCKER_APP   = "icsquiz_user_app"
-        SPRING_PORT  = "3090"
-
-        VPS_HOST     = credentials('VPS_HOST')
-        PROD_USER    = credentials('DO_USER')
+        VPS_HOST = credentials('DO_HOST')       // e.g., 159.89.172.251
+        VPS_USER = credentials('DO_USER')       // e.g., root
+        SSH_KEY  = credentials('DO_SSH_KEY')
+        APP_DIR  = "/www/wwwroot/CITSNVN/icsQuizUserService"
+        JAR_NAME = "icsQuizUserService-0.1.jar"
+        DOCKER_IMAGE = "icsquiz_user_service"
+        APP_PORT = "3090"
     }
 
     stages {
 
-        stage('Clone Repository') {
+        stage('Clone Repo') {
             steps {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
 
-        stage('Build Spring Boot JAR') {
+        stage('Build JAR') {
             steps {
-                bat 'mvn clean package -DskipTests'
+                bat "mvn clean package -DskipTests"
             }
         }
 
-        stage('Build Docker Image (Jenkins)') {
+        stage('Upload JAR to VPS') {
             steps {
-                bat """
-                    docker build -t ${IMAGE_NAME} .
-                """
-            }
-        }
-
-        stage('Create TAR from Docker Image') {
-            steps {
-                bat """
-                    docker save -o ${APP_NAME}.tar ${IMAGE_NAME}
-                """
-            }
-        }
-
-        stage('Copy Image TAR to VPS') {
-            steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                script {
                     bat """
-                        "C:/Program Files/Git/bin/bash.exe" -c \
-                        "scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${APP_NAME}.tar ${PROD_USER}@${VPS_HOST}:${REMOTE_DIR}/${APP_NAME}.tar"
+                    "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i ${SSH_KEY} target/${JAR_NAME} ${VPS_USER}@${VPS_HOST}:${APP_DIR}/${JAR_NAME}"
+                    """
+                }
+            }
+        }
+
+        stage('Build Docker Image on VPS') {
+            steps {
+                script {
+                    bat """
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${VPS_USER}@${VPS_HOST} '
+                        cd ${APP_DIR};
+                        echo Building Docker Image...
+                        docker build -t ${DOCKER_IMAGE}:latest .
+                    '"
                     """
                 }
             }
@@ -55,25 +51,23 @@ pipeline {
 
         stage('Deploy Docker App on VPS') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                script {
                     bat """
-                        "C:/Program Files/Git/bin/bash.exe" -c \
-                        "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${VPS_HOST} '
-                            cd ${REMOTE_DIR};
-                            echo "-- Loading Docker Image --";
-                            docker load -i ${APP_NAME}.tar;
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${VPS_USER}@${VPS_HOST} '
+                        cd ${APP_DIR};
 
-                            echo "-- Stopping Previous Container --";
-                            docker stop ${DOCKER_APP} || true;
-                            docker rm ${DOCKER_APP} || true;
+                        echo Stopping old container...
+                        if docker ps -q --filter "name=icsquiz-user-app"; then
+                            docker stop icsquiz-user-app || true;
+                            docker rm icsquiz-user-app || true;
+                        fi
 
-                            echo "-- Starting New Docker Container --";
-                            docker run -d \\
-                                --name ${DOCKER_APP} \\
-                                -p ${SPRING_PORT}:3090 \\
-                                --restart unless-stopped \\
-                                ${IMAGE_NAME}
-                        '"
+                        echo Removing old images...
+                        docker image prune -f;
+
+                        echo Starting new container...
+                        docker run -d --name icsquiz-user-app -p ${APP_PORT}:${APP_PORT} ${DOCKER_IMAGE}:latest
+                    '"
                     """
                 }
             }
@@ -83,10 +77,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ ICS Quiz User Service Docker Deployment Successful!"
+            echo "✅ User Service deployed successfully on port 3090!"
         }
         failure {
-            echo "❌ Deployment Failed!"
+            echo "❌ Deployment failed!"
         }
     }
 }
