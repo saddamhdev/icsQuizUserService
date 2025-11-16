@@ -3,15 +3,14 @@ pipeline {
 
     environment {
         APP_NAME     = "icsquiz-user-service"
-        IMAGE_NAME   = "icsquiz-user-service:latest"
+        JAR_NAME     = "icsQuizUserService-0.1.jar"
         REMOTE_DIR   = "/www/wwwroot/CITSNVN/icsQuizUserService"
         DOCKER_APP   = "icsquiz_user_app"
         SPRING_PORT  = "3090"
 
-        JAR_NAME     = "icsQuizUserService-0.1.jar"
-
         VPS_HOST     = credentials('VPS_HOST')
         PROD_USER    = credentials('DO_USER')
+        SSH_KEY      = credentials('DO_SSH_KEY')
     }
 
     stages {
@@ -22,59 +21,55 @@ pipeline {
             }
         }
 
-        stage('Build Spring Boot JAR') {
+        stage('Build JAR') {
             steps {
-                bat 'mvn clean package -DskipTests'
+                bat "mvn clean package -DskipTests"
             }
         }
 
         stage('Upload JAR to VPS') {
             steps {
-                sshagent(['DO_SSH_KEY']) {
-                    sh """
-                        scp -o StrictHostKeyChecking=no target/${JAR_NAME} ${PROD_USER}@${VPS_HOST}:${REMOTE_DIR}/${JAR_NAME}
-                    """
-                }
-            }
-        }
-
-        stage('Build Docker Image on VPS') {
-            steps {
-                sshagent(['DO_SSH_KEY']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${PROD_USER}@${VPS_HOST} '
-                            cd ${REMOTE_DIR};
-                            docker build -t ${IMAGE_NAME} .;
-                        '
-                    """
-                }
+                sshPut remote: [
+                    host: "${VPS_HOST}",
+                    user: "${PROD_USER}",
+                    identity: "${SSH_KEY}",
+                    allowAnyHosts: true
+                ],
+                from: "target/${JAR_NAME}",
+                into: "${REMOTE_DIR}/${JAR_NAME}"
             }
         }
 
         stage('Deploy Docker App on VPS') {
             steps {
-                sshagent(['DO_SSH_KEY']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${PROD_USER}@${VPS_HOST} '
-                            cd ${REMOTE_DIR};
+                sshCommand remote: [
+                    host: "${VPS_HOST}",
+                    user: "${PROD_USER}",
+                    identity: "${SSH_KEY}",
+                    allowAnyHosts: true
+                ], command: """
+                    cd ${REMOTE_DIR};
 
-                            docker stop ${DOCKER_APP} || true;
-                            docker rm ${DOCKER_APP} || true;
+                    echo "🔹 Building Docker image";
+                    docker build -t ${APP_NAME}:latest .
 
-                            docker run -d \\
-                                --name ${DOCKER_APP} \\
-                                -p ${SPRING_PORT}:3090 \\
-                                --restart unless-stopped \\
-                                ${IMAGE_NAME};
-                        '
-                    """
-                }
+                    echo "🔹 Stopping old container";
+                    docker stop ${DOCKER_APP} || true
+                    docker rm ${DOCKER_APP} || true
+
+                    echo "🔹 Starting new container";
+                    docker run -d \\
+                        --name ${DOCKER_APP} \\
+                        -p ${SPRING_PORT}:3090 \\
+                        --restart unless-stopped \\
+                        ${APP_NAME}:latest
+                """
             }
         }
     }
 
     post {
-        success { echo "✅ ICS Quiz User Service Deployment Successful!" }
+        success { echo "✅ Deployment Successful!" }
         failure { echo "❌ Deployment Failed!" }
     }
 }
