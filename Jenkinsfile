@@ -2,15 +2,15 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME     = "icsquiz-user-service"
-        JAR_NAME     = "icsQuizUserService-0.1.jar"
-        REMOTE_DIR   = "/www/wwwroot/CITSNVN/icsQuizUserService"
-        DOCKER_APP   = "icsquiz_user_app"
-        SPRING_PORT  = "3090"
+        APP_NAME    = "icsquiz-user-service"
+        IMAGE_NAME  = "icsquiz-user-service:latest"
+        REMOTE_DIR  = "/www/wwwroot/CITSNVN/icsQuizUserService"
+        DOCKER_APP  = "icsquiz_user_app"
+        SPRING_PORT = "3090"
 
-        VPS_HOST     = credentials('VPS_HOST')
-        PROD_USER    = credentials('DO_USER')
-        SSH_KEY      = credentials('DO_SSH_KEY')
+        PROD_HOST   = credentials('DO_HOST')
+        PROD_USER   = credentials('DO_USER')
+        JAR_NAME    = "icsQuizUserService-0.1.jar"
     }
 
     stages {
@@ -23,59 +23,56 @@ pipeline {
 
         stage('Build JAR') {
             steps {
-                bat "mvn clean package -DskipTests"
+                bat 'mvn clean package -DskipTests'
             }
         }
 
         stage('Upload JAR to VPS') {
             steps {
-
-                sshPut remote: [
-                    name: "icsquiz-vps",     // 🔥 REQUIRED FIELD
-                    host: "${VPS_HOST}",
-                    user: "${PROD_USER}",
-                    identity: "${SSH_KEY}",
-                    allowAnyHosts: true
-                ],
-                from: "target/${JAR_NAME}",
-                into: "${REMOTE_DIR}/${JAR_NAME}"
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat """
+                    "C:/Program Files/Git/bin/bash.exe" -c \
+                    "scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${REMOTE_DIR}/${JAR_NAME}"
+                    """
+                }
             }
         }
 
-        stage('Deploy Docker App on VPS') {
+        stage('Build Docker + Deploy on VPS') {
             steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat """
+                    "C:/Program Files/Git/bin/bash.exe" -c \
+                    "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${PROD_HOST} '
+                        cd ${REMOTE_DIR};
 
-                sshCommand remote: [
-                    name: "icsquiz-vps",     // 🔥 REQUIRED FIELD
-                    host: "${VPS_HOST}",
-                    user: "${PROD_USER}",
-                    identity: "${SSH_KEY}",
-                    allowAnyHosts: true
-                ], command: """
-                    echo '--- Updating App on VPS ---';
+                        echo \"-- Building Docker image --\";
+                        docker build -t ${IMAGE_NAME} .;
 
-                    cd ${REMOTE_DIR};
+                        echo \"-- Stopping Old Container --\";
+                        docker stop ${DOCKER_APP} || true;
+                        docker rm ${DOCKER_APP} || true;
 
-                    echo '--- Building Docker Image ---';
-                    docker build -t ${APP_NAME}:latest .
-
-                    echo '--- Stopping Old Container ---';
-                    docker stop ${DOCKER_APP} || true;
-                    docker rm ${DOCKER_APP} || true;
-
-                    echo '--- Starting New Container ---';
-                    docker run -d \
-                        --name ${DOCKER_APP} \
-                        -p ${SPRING_PORT}:3090 \
-                        --restart unless-stopped \
-                        ${APP_NAME}:latest;
-                """
+                        echo \"-- Starting New Container --\";
+                        docker run -d \\
+                            --name ${DOCKER_APP} \\
+                            -p ${SPRING_PORT}:3090 \\
+                            --restart unless-stopped \\
+                            ${IMAGE_NAME};
+                    '"
+                    """
+                }
             }
         }
+
     }
 
     post {
-        success { echo "✅ Deployment Successful!" }
-        failure { echo "❌ Deployment Failed!" }
+        success {
+            echo "✅ ICSQuiz User Service deployed successfully via Docker!"
+        }
+        failure {
+            echo "❌ Deployment failed!"
+        }
     }
 }
