@@ -27,13 +27,14 @@ pipeline {
 
         stage('Upload JAR to VPS') {
             steps {
-                script {
+                sshagent(['DO_SSH_KEY']) {
                     bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i ${SSH_KEY} target/${JAR_NAME} ${VPS_USER}@${VPS_HOST}:${APP_DIR}/${JAR_NAME}"
+                    "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no target/${JAR_NAME} ${VPS_USER}@${VPS_HOST}:${APP_DIR}/${JAR_NAME}"
                     """
                 }
             }
         }
+
 
         stage('Build Docker Image on VPS') {
             steps {
