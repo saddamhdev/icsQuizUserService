@@ -29,7 +29,9 @@ pipeline {
 
         stage('Upload JAR to VPS') {
             steps {
+
                 sshPut remote: [
+                    name: "icsquiz-vps",     // 🔥 REQUIRED FIELD
                     host: "${VPS_HOST}",
                     user: "${PROD_USER}",
                     identity: "${SSH_KEY}",
@@ -42,27 +44,31 @@ pipeline {
 
         stage('Deploy Docker App on VPS') {
             steps {
+
                 sshCommand remote: [
+                    name: "icsquiz-vps",     // 🔥 REQUIRED FIELD
                     host: "${VPS_HOST}",
                     user: "${PROD_USER}",
                     identity: "${SSH_KEY}",
                     allowAnyHosts: true
                 ], command: """
+                    echo '--- Updating App on VPS ---';
+
                     cd ${REMOTE_DIR};
 
-                    echo "🔹 Building Docker image";
+                    echo '--- Building Docker Image ---';
                     docker build -t ${APP_NAME}:latest .
 
-                    echo "🔹 Stopping old container";
-                    docker stop ${DOCKER_APP} || true
-                    docker rm ${DOCKER_APP} || true
+                    echo '--- Stopping Old Container ---';
+                    docker stop ${DOCKER_APP} || true;
+                    docker rm ${DOCKER_APP} || true;
 
-                    echo "🔹 Starting new container";
-                    docker run -d \\
-                        --name ${DOCKER_APP} \\
-                        -p ${SPRING_PORT}:3090 \\
-                        --restart unless-stopped \\
-                        ${APP_NAME}:latest
+                    echo '--- Starting New Container ---';
+                    docker run -d \
+                        --name ${DOCKER_APP} \
+                        -p ${SPRING_PORT}:3090 \
+                        --restart unless-stopped \
+                        ${APP_NAME}:latest;
                 """
             }
         }
