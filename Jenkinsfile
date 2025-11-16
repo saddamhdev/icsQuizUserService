@@ -8,6 +8,8 @@ pipeline {
         DOCKER_APP   = "icsquiz_user_app"
         SPRING_PORT  = "3090"
 
+        JAR_NAME     = "icsQuizUserService-0.1.jar"   // ✅ FIXED JAR NAME
+
         VPS_HOST     = credentials('VPS_HOST')
         PROD_USER    = credentials('DO_USER')
     }
@@ -26,72 +28,45 @@ pipeline {
             }
         }
 
-        // ---------------------------
-        // UPLOAD JAR TO VPS
-        // ---------------------------
         stage('Upload JAR to VPS') {
             steps {
-                withCredentials([
-                    sshUserPrivateKey(credentialsId: 'DO_SSH_KEY',
-                                      keyFileVariable: 'SSH_KEY')
-                ]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c \
-                    "scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' target/${APP_NAME}-0.1.jar \
-                    ${PROD_USER}@${VPS_HOST}:${REMOTE_DIR}/${APP_NAME}.jar"
+                        "C:/Program Files/Git/bin/bash.exe" -c \
+                        "scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' target/${JAR_NAME} ${PROD_USER}@${VPS_HOST}:${REMOTE_DIR}/${JAR_NAME}"
                     """
                 }
             }
         }
 
-        // ---------------------------
-        // BUILD DOCKER IMAGE ON VPS
-        // ---------------------------
         stage('Build Docker Image on VPS') {
             steps {
-                withCredentials([
-                    sshUserPrivateKey(credentialsId: 'DO_SSH_KEY',
-                                      keyFileVariable: 'SSH_KEY')
-                ]) {
-                    bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c \
-                    "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${VPS_HOST} '
-                        cd ${REMOTE_DIR};
-                        echo \"-- Building Docker Image on VPS --\";
-                        docker build -t ${IMAGE_NAME} .
-                    '"
-                    """
-                }
+                echo "Docker build will be done on VPS after SCP."
             }
         }
 
-        // ---------------------------
-        // DEPLOY CONTAINER ON VPS
-        // ---------------------------
         stage('Deploy Docker App on VPS') {
             steps {
-                withCredentials([
-                    sshUserPrivateKey(credentialsId: 'DO_SSH_KEY',
-                                      keyFileVariable: 'SSH_KEY')
-                ]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c \
-                    "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${VPS_HOST} '
-                        echo \"-- Stopping Old Container --\";
+                        "C:/Program Files/Git/bin/bash.exe" -c \
+                        "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${VPS_HOST} '
+                            cd ${REMOTE_DIR};
 
-                        docker stop ${DOCKER_APP} || true;
-                        docker rm ${DOCKER_APP} || true;
+                            echo \"-- Building Docker Image --\";
+                            docker build -t ${IMAGE_NAME} .;
 
-                        echo \"-- Starting New Container --\";
+                            echo \"-- Stopping Previous Container --\";
+                            docker stop ${DOCKER_APP} || true;
+                            docker rm ${DOCKER_APP} || true;
 
-                        docker run -d \
-                          --name ${DOCKER_APP} \
-                          -p ${SPRING_PORT}:3090 \
-                          --restart unless-stopped \
-                          ${IMAGE_NAME};
-
-                        echo \"-- Deployment Completed --\";
-                    '"
+                            echo \"-- Starting New Docker Container --\";
+                            docker run -d \\
+                                --name ${DOCKER_APP} \\
+                                -p ${SPRING_PORT}:3090 \\
+                                --restart unless-stopped \\
+                                ${IMAGE_NAME}
+                        '"
                     """
                 }
             }
@@ -100,10 +75,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ ICS Quiz User Service Deployment Successful (Docker on VPS)!"
+            echo "✅ ICS Quiz User Service Deployment Successful!"
         }
         failure {
-            echo "❌ Deployment failed!"
+            echo "❌ Deployment Failed!"
         }
     }
 }
