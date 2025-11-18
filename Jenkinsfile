@@ -82,7 +82,7 @@ pipeline {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
                     echo === Starting SCP transfer for JAR ===
-                    "C:/Program Files/Git/bin/bash.exe" -c "scp -v -o StrictHostKeyChecking=no -i '%SSH_KEY%' target\\%JAR_NAME% %PROD_USER%@%PROD_HOST%:%REMOTE_DIR%/%JAR_NAME%"
+                    "C:/Program Files/Git/bin/bash.exe" -c "scp -v -o StrictHostKeyChecking=no -i '%SSH_KEY%' target/%JAR_NAME% %PROD_USER%@%PROD_HOST%:%REMOTE_DIR%/%JAR_NAME%"
 
                     echo === Upload complete ===
                     '''
