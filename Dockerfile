@@ -1,24 +1,13 @@
-# ================================
-# Stage 1 — Build JAR using Maven
-# ================================
-FROM maven:3.9.9-eclipse-temurin-21 AS builder
+# Simple Dockerfile - JAR is already built by Jenkins and copied to VPS
+FROM eclipse-temurin:21-jre-slim
+
 WORKDIR /app
 
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
+# Copy the pre-built JAR
+COPY icsQuizUserService-0.1.jar app.jar
 
-# ================================
-# Stage 2 — Run JAR with Java 21
-# ================================
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-
-# Copy JAR
-COPY --from=builder /app/target/*.jar app.jar
-
-# You want container to run on 3090
+# Expose the port
 EXPOSE 3090
 
-# Spring Boot will now run on 3090 inside the container
-ENTRYPOINT ["java", "-XX:+UseG1GC", "-jar", "/app/app.jar", "--server.port=3090"]
+# Run the Spring Boot application
+ENTRYPOINT ["java", "-Xmx512m", "-jar", "app.jar", "--server.port=3090"]
