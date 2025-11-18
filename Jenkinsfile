@@ -63,29 +63,27 @@ pipeline {
             }
         }
 
-        stage('Deploy on VPS') {
-            steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                            bat """
-                "C:/Program Files/Git/bin/bash.exe" -c 'ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" $PROD_USER@$PROD_HOST "
-                    cd $REMOTE_DIR &&
-                    echo === Building Docker Image === &&
-                    docker build -t icsquiz-user-service:latest . &&
+       stage('Deploy on VPS') {
+                   steps {
+                       withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                           bat '''
+               "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY\" $PROD_USER@$PROD_HOST \\
+                   'cd $REMOTE_DIR && \\
+                   echo === Building Docker Image === && \\
+                   docker build -t icsquiz-user-service:latest . && \\
+                   echo === Stopping Old Container === && \\
+                   docker stop icsquiz_user_app || true && \\
+                   docker rm icsquiz_user_app || true && \\
+                   echo === Starting New Container === && \\
+                   docker run -d --name icsquiz_user_app -p 3090:3090 --restart unless-stopped icsquiz-user-service:latest && \\
+                   docker ps | grep icsquiz_user_app && \\
+                   echo === Deployment Complete ==='
+               \""
+               '''
+                       }
+                   }
+               }
 
-                    echo === Stopping Old Container === &&
-                    docker stop icsquiz_user_app || true &&
-                    docker rm icsquiz_user_app || true &&
-
-                    echo === Starting New Container === &&
-                    docker run -d --name icsquiz_user_app -p 3090:3090 --restart unless-stopped icsquiz-user-service:latest &&
-
-                    docker ps | grep icsquiz_user_app &&
-                    echo === Deployment Complete ===
-                "'
-                            """
-                        }
-                    }
-                }
         }
 
     post {
