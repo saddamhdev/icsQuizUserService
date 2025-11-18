@@ -125,62 +125,57 @@ set -e
 REMOTE_DIR="/www/wwwroot/CITSNVN/icsQuizUserService"
 
 echo "=========================================="
-echo "=== DEPLOYMENT DEBUG SCRIPT START ==="
+echo "=== DOCKER BUILD DIAGNOSTICS ==="
 echo "=========================================="
 
-echo "=== 1. Environment Info ==="
+echo ""
+echo "=== 1. Current User & Permissions ==="
 echo "Current User: $(whoami)"
-echo "Current Directory: $(pwd)"
-echo "Shell: $SHELL"
+echo "Current UID: $(id -u)"
+echo "Current GID: $(id -g)"
+echo "Docker Group: $(getent group docker | cut -d: -f3)"
 
 echo ""
-echo "=== 2. Verifying remote directory ==="
-if [ -d "$REMOTE_DIR" ]; then
-    echo "✓ Remote directory exists: $REMOTE_DIR"
-else
-    echo "✗ Remote directory does NOT exist: $REMOTE_DIR"
-    exit 1
-fi
+echo "=== 2. Directory Permissions ==="
+ls -ld "$REMOTE_DIR"
+stat "$REMOTE_DIR" | grep -E "Access:|Uid:|Gid:"
 
 echo ""
-echo "=== 3. Listing files in remote directory ==="
+echo "=== 3. File Permissions ==="
 ls -lh "$REMOTE_DIR"
 
 echo ""
-echo "=== 4. Checking file integrity ==="
+echo "=== 4. Dockerfile Specific Details ==="
 if [ -f "$REMOTE_DIR/Dockerfile" ]; then
-    echo "✓ Dockerfile exists"
-    echo "File size: $(du -h "$REMOTE_DIR/Dockerfile" | cut -f1)"
-    echo "First 20 lines:"
-    head -20 "$REMOTE_DIR/Dockerfile"
+    echo "Dockerfile exists"
+    stat "$REMOTE_DIR/Dockerfile"
+    echo ""
+    echo "Dockerfile Content:"
+    cat "$REMOTE_DIR/Dockerfile"
+    echo ""
+    echo "Dockerfile is readable: $(test -r "$REMOTE_DIR/Dockerfile" && echo 'YES' || echo 'NO')"
 else
-    echo "✗ Dockerfile NOT FOUND"
-    exit 1
-fi
-
-if [ -f "$REMOTE_DIR/icsQuizUserService-0.1.jar" ]; then
-    echo "✓ JAR file exists"
-    echo "File size: $(du -h "$REMOTE_DIR/icsQuizUserService-0.1.jar" | cut -f1)"
-else
-    echo "✗ JAR file NOT FOUND"
-    exit 1
+    echo "Dockerfile NOT FOUND"
 fi
 
 echo ""
-echo "=== 5. Checking Docker daemon ==="
-docker ps
-docker --version
+echo "=== 5. Checking for Windows line endings ==="
+if file "$REMOTE_DIR/Dockerfile" | grep -q CRLF; then
+    echo "WARNING: Dockerfile has Windows line endings"
+    echo "Converting to Unix line endings..."
+    sed -i 's/\r$//' "$REMOTE_DIR/Dockerfile"
+fi
 
 echo ""
-echo "=== 6. Changing to remote directory ==="
+echo "=== 6. Fix File Permissions ==="
+chmod 644 "$REMOTE_DIR/Dockerfile"
+chmod 644 "$REMOTE_DIR/icsQuizUserService-0.1.jar"
+chmod 755 "$REMOTE_DIR"
+echo "Permissions updated"
+
+echo ""
+echo "=== 7. Docker Build with Absolute Path ==="
 cd "$REMOTE_DIR"
-echo "Current directory: $(pwd)"
-echo "Files here:"
-ls -lh .
-
-echo ""
-echo "=== 7. Building Docker image ==="
-echo "Running: docker build -t icsquiz-user-service:latest ."
 docker build -t icsquiz-user-service:latest .
 
 echo ""
@@ -189,8 +184,8 @@ docker images | grep icsquiz-user-service
 
 echo ""
 echo "=== 9. Stopping old container ==="
-docker stop icsquiz_user_app || echo "No running container to stop"
-docker rm icsquiz_user_app || echo "No container to remove"
+docker stop icsquiz_user_app 2>/dev/null || echo "No running container"
+docker rm icsquiz_user_app 2>/dev/null || echo "No container to remove"
 
 echo ""
 echo "=== 10. Starting new container ==="
@@ -203,7 +198,7 @@ docker ps | grep icsquiz_user_app
 
 echo ""
 echo "=========================================="
-echo "=== DEPLOYMENT DEBUG SCRIPT SUCCESS ==="
+echo "=== DEPLOYMENT SUCCESSFUL ==="
 echo "=========================================="
 '''
                     echo "Deploy script created"
