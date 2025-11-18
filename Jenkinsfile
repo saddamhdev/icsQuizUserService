@@ -7,9 +7,6 @@ pipeline {
 
         REMOTE_DIR = "/www/wwwroot/CITSNVN/icsQuizUserService"
         JAR_NAME   = "icsQuizUserService-0.1.jar"
-        DOCKER_APP = "icsquiz_user_app"
-        SPRING_PORT = "3090"
-        IMAGE_NAME  = "icsquiz-user-service:latest"
     }
 
     stages {
@@ -46,31 +43,26 @@ pipeline {
             }
         }
 
-        stage('Upload Dockerfile to VPS') {
+        stage('Upload Deployment Files to VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
                     "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i '%SSH_KEY%' Dockerfile %PROD_USER%@%PROD_HOST%:%REMOTE_DIR%/Dockerfile"
                     '''
+                    withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                        bat '''
+                        "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i '%SSH_KEY%' deploy.sh %PROD_USER%@%PROD_HOST%:%REMOTE_DIR%/deploy.sh"
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Verify Files on VPS') {
+        stage('Deploy on VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'echo === Files in %REMOTE_DIR% === && ls -lh %REMOTE_DIR%'"
-                    '''
-                }
-            }
-        }
-
-        stage('Build Docker + Deploy on VPS') {
-            steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                    bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %REMOTE_DIR% && echo === Building Docker Image === && docker build -t icsquiz-user-service:latest . && echo === Stopping Old Container === && docker stop icsquiz_user_app || true && docker rm icsquiz_user_app || true && echo === Starting New Container === && docker run -d --name icsquiz_user_app -p 3090:3090 --restart unless-stopped icsquiz-user-service:latest && echo === Deployment Complete ===' "
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'chmod +x %REMOTE_DIR%/deploy.sh && %REMOTE_DIR%/deploy.sh'"
                     '''
                 }
             }
