@@ -26,6 +26,16 @@ pipeline {
             }
         }
 
+        stage('Prepare Remote Directory') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat '''
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'mkdir -p %REMOTE_DIR%'"
+                    '''
+                }
+            }
+        }
+
         stage('Upload JAR to VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
@@ -46,11 +56,21 @@ pipeline {
             }
         }
 
+        stage('Verify Files on VPS') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat '''
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'echo === Files in %REMOTE_DIR% === && ls -lh %REMOTE_DIR%'"
+                    '''
+                }
+            }
+        }
+
         stage('Build Docker + Deploy on VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %REMOTE_DIR% && echo --- Building Docker Image --- && docker build -t %IMAGE_NAME% . && echo --- Stopping Old Container --- && docker stop %DOCKER_APP% || true && docker rm %DOCKER_APP% || true && echo --- Starting New Container --- && docker run -d --name %DOCKER_APP% -p %SPRING_PORT%:3090 --restart unless-stopped %IMAGE_NAME%'"
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %REMOTE_DIR% && echo === Building Docker Image === && docker build -t icsquiz-user-service:latest . && echo === Stopping Old Container === && docker stop icsquiz_user_app || true && docker rm icsquiz_user_app || true && echo === Starting New Container === && docker run -d --name icsquiz_user_app -p 3090:3090 --restart unless-stopped icsquiz-user-service:latest && echo === Deployment Complete ==="
                     '''
                 }
             }
