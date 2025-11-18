@@ -53,6 +53,16 @@ pipeline {
             }
         }
 
+        stage('Verify Files on VPS') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat '''
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'echo === Files in %REMOTE_DIR% === && ls -lh %REMOTE_DIR% && echo === Current Working Directory === && pwd'"
+                    '''
+                }
+            }
+        }
+
         stage('Deploy on VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
