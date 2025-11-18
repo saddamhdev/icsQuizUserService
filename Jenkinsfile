@@ -88,8 +88,10 @@ pipeline {
                       }
                       withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                           bat '''
-              "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i $SSH_KEY remote-deploy.sh $PROD_USER@$PROD_HOST:/tmp/remote-deploy.sh"
-              "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'bash /tmp/remote-deploy.sh'"
+             "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i $SSH_KEY remote-deploy.sh $PROD_USER@$PROD_HOST:/tmp/remote-deploy.sh"
+
+             "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'chmod +x /tmp/remote-deploy.sh && bash /tmp/remote-deploy.sh'"
+
               '''
                       }
                   }
