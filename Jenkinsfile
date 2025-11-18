@@ -62,7 +62,7 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'chmod +x %REMOTE_DIR%/deploy.sh && %REMOTE_DIR%/deploy.sh'"
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'dos2unix %REMOTE_DIR%/deploy.sh 2>/dev/null || sed -i \"s/\r$//\" %REMOTE_DIR%/deploy.sh && chmod +x %REMOTE_DIR%/deploy.sh && %REMOTE_DIR%/deploy.sh'"
                     '''
                 }
             }
