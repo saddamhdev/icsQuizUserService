@@ -50,11 +50,11 @@ pipeline {
                 )
 
                 echo === Checking JAR existence ===
-                if exist target\%JAR_NAME% (
-                    echo JAR FOUND: target\%JAR_NAME%
-                    dir target\%JAR_NAME%
+                if exist target\\%JAR_NAME% (
+                    echo JAR FOUND: target\\%JAR_NAME%
+                    dir target\\%JAR_NAME%
                 ) else (
-                    echo ERROR: JAR NOT FOUND in target\
+                    echo ERROR: JAR NOT FOUND in target
                     dir target
                 )
                 '''
@@ -119,93 +119,93 @@ pipeline {
             steps {
                 echo "=== DEBUG: Creating deploy script ==="
                 script {
-                                        writeFile file: 'remote-deploy.sh', text: '''#!/bin/bash
-                    set -e
+                    writeFile file: 'remote-deploy.sh', text: '''#!/bin/bash
+set -e
 
-                    REMOTE_DIR="/www/wwwroot/CITSNVN/icsQuizUserService"
+REMOTE_DIR="/www/wwwroot/CITSNVN/icsQuizUserService"
 
-                    echo "=========================================="
-                    echo "=== DEPLOYMENT DEBUG SCRIPT START ==="
-                    echo "=========================================="
+echo "=========================================="
+echo "=== DEPLOYMENT DEBUG SCRIPT START ==="
+echo "=========================================="
 
-                    echo "=== 1. Environment Info ==="
-                    echo "Current User: $(whoami)"
-                    echo "Current Directory: $(pwd)"
-                    echo "Shell: $SHELL"
+echo "=== 1. Environment Info ==="
+echo "Current User: $(whoami)"
+echo "Current Directory: $(pwd)"
+echo "Shell: $SHELL"
 
-                    echo ""
-                    echo "=== 2. Verifying remote directory ==="
-                    if [ -d "$REMOTE_DIR" ]; then
-                        echo "✓ Remote directory exists: $REMOTE_DIR"
-                    else
-                        echo "✗ Remote directory does NOT exist: $REMOTE_DIR"
-                        exit 1
-                    fi
+echo ""
+echo "=== 2. Verifying remote directory ==="
+if [ -d "$REMOTE_DIR" ]; then
+    echo "✓ Remote directory exists: $REMOTE_DIR"
+else
+    echo "✗ Remote directory does NOT exist: $REMOTE_DIR"
+    exit 1
+fi
 
-                    echo ""
-                    echo "=== 3. Listing files in remote directory ==="
-                    ls -lh "$REMOTE_DIR"
+echo ""
+echo "=== 3. Listing files in remote directory ==="
+ls -lh "$REMOTE_DIR"
 
-                    echo ""
-                    echo "=== 4. Checking file integrity ==="
-                    if [ -f "$REMOTE_DIR/Dockerfile" ]; then
-                        echo "✓ Dockerfile exists"
-                        echo "File size: $(du -h "$REMOTE_DIR/Dockerfile" | cut -f1)"
-                        echo "First 20 lines:"
-                        head -20 "$REMOTE_DIR/Dockerfile"
-                    else
-                        echo "✗ Dockerfile NOT FOUND"
-                        exit 1
-                    fi
+echo ""
+echo "=== 4. Checking file integrity ==="
+if [ -f "$REMOTE_DIR/Dockerfile" ]; then
+    echo "✓ Dockerfile exists"
+    echo "File size: $(du -h "$REMOTE_DIR/Dockerfile" | cut -f1)"
+    echo "First 20 lines:"
+    head -20 "$REMOTE_DIR/Dockerfile"
+else
+    echo "✗ Dockerfile NOT FOUND"
+    exit 1
+fi
 
-                    if [ -f "$REMOTE_DIR/icsQuizUserService-0.1.jar" ]; then
-                        echo "✓ JAR file exists"
-                        echo "File size: $(du -h "$REMOTE_DIR/icsQuizUserService-0.1.jar" | cut -f1)"
-                    else
-                        echo "✗ JAR file NOT FOUND"
-                        exit 1
-                    fi
+if [ -f "$REMOTE_DIR/icsQuizUserService-0.1.jar" ]; then
+    echo "✓ JAR file exists"
+    echo "File size: $(du -h "$REMOTE_DIR/icsQuizUserService-0.1.jar" | cut -f1)"
+else
+    echo "✗ JAR file NOT FOUND"
+    exit 1
+fi
 
-                    echo ""
-                    echo "=== 5. Checking Docker daemon ==="
-                    docker ps
-                    docker --version
+echo ""
+echo "=== 5. Checking Docker daemon ==="
+docker ps
+docker --version
 
-                    echo ""
-                    echo "=== 6. Changing to remote directory ==="
-                    cd "$REMOTE_DIR"
-                    echo "Current directory: $(pwd)"
-                    echo "Files here:"
-                    ls -lh .
+echo ""
+echo "=== 6. Changing to remote directory ==="
+cd "$REMOTE_DIR"
+echo "Current directory: $(pwd)"
+echo "Files here:"
+ls -lh .
 
-                    echo ""
-                    echo "=== 7. Building Docker image ==="
-                    echo "Running: docker build -t icsquiz-user-service:latest ."
-                    docker build -t icsquiz-user-service:latest .
+echo ""
+echo "=== 7. Building Docker image ==="
+echo "Running: docker build -t icsquiz-user-service:latest ."
+docker build -t icsquiz-user-service:latest .
 
-                    echo ""
-                    echo "=== 8. Verifying Docker image ==="
-                    docker images | grep icsquiz-user-service
+echo ""
+echo "=== 8. Verifying Docker image ==="
+docker images | grep icsquiz-user-service
 
-                    echo ""
-                    echo "=== 9. Stopping old container ==="
-                    docker stop icsquiz_user_app || echo "No running container to stop"
-                    docker rm icsquiz_user_app || echo "No container to remove"
+echo ""
+echo "=== 9. Stopping old container ==="
+docker stop icsquiz_user_app || echo "No running container to stop"
+docker rm icsquiz_user_app || echo "No container to remove"
 
-                    echo ""
-                    echo "=== 10. Starting new container ==="
-                    docker run -d --name icsquiz_user_app -p 3090:3090 --restart unless-stopped icsquiz-user-service:latest
+echo ""
+echo "=== 10. Starting new container ==="
+docker run -d --name icsquiz_user_app -p 3090:3090 --restart unless-stopped icsquiz-user-service:latest
 
-                    echo ""
-                    echo "=== 11. Verifying deployment ==="
-                    sleep 2
-                    docker ps | grep icsquiz_user_app
+echo ""
+echo "=== 11. Verifying deployment ==="
+sleep 2
+docker ps | grep icsquiz_user_app
 
-                    echo ""
-                    echo "=========================================="
-                    echo "=== DEPLOYMENT DEBUG SCRIPT SUCCESS ==="
-                    echo "=========================================="
-                    '''
+echo ""
+echo "=========================================="
+echo "=== DEPLOYMENT DEBUG SCRIPT SUCCESS ==="
+echo "=========================================="
+'''
                     echo "Deploy script created"
                     bat 'type remote-deploy.sh'
                 }
@@ -234,8 +234,8 @@ pipeline {
             echo === Final local workspace state ===
             dir
             echo === JAR exists: ===
-            if exist target\%JAR_NAME% (
-                echo YES - target\%JAR_NAME%
+            if exist target\\%JAR_NAME% (
+                echo YES - target\\%JAR_NAME%
             ) else (
                 echo NO - JAR not found
             )
