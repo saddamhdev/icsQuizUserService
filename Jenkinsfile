@@ -2,76 +2,88 @@ pipeline {
     agent any
 
     environment {
-        PROD_HOST     = credentials('DO_HOST')
-        PROD_USER     = credentials('DO_USER')
-        PROJECT_DIR   = '/www/wwwroot/CITSNVN/icsQuizUserService'
-    }
-
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
-        timestamps()
+        PROD_HOST  = credentials('DO_HOST')
+        PROD_USER  = credentials('DO_USER')
+        REMOTE_DIR = "/www/wwwroot/CITSNVN/icsQuizUserService"
     }
 
     stages {
-        stage('🔍 Clone Repository') {
+
+        stage('Clone Repository') {
             steps {
-                echo "Cloning repository..."
+                echo "=== Cloning Repository ==="
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
-                echo "✅ Repository cloned"
+                echo "✅ Repository cloned successfully"
             }
         }
 
-        stage('📤 Upload Project to VPS') {
+        stage('Prepare Remote Directory') {
             steps {
-                echo "Uploading project to VPS..."
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
-                    bat '''
-                    echo === Preparing remote directory ===
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -v -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'mkdir -p %PROJECT_DIR%'"
-
-                    echo === Uploading project files ===
-                    "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %PROJECT_DIR% && tar -xzf -'"
-
-                    echo ✅ Project uploaded
-                    '''
-                }
-            }
-        }
-
-        stage('🚀 Build & Deploy on VPS') {
-            steps {
-                echo "Building and deploying on VPS..."
+                echo "=== Preparing Remote Directory ==="
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    echo === Executing deployment script ===
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %PROJECT_DIR% && bash vps-deploy.sh'"
+                    echo === Testing SSH Connection ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'echo ✅ SSH OK && whoami'"
+
+                    echo === Cleaning and creating remote directory ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'rm -rf %REMOTE_DIR% && mkdir -p %REMOTE_DIR%'"
+
+                    echo ✅ Remote directory ready
                     '''
                 }
             }
         }
 
-        stage('✅ Verification') {
+        stage('Upload Entire Project to VPS') {
             steps {
-                echo "Verifying deployment..."
+                echo "=== Uploading Entire Project ==="
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'docker ps | grep icsquiz_user_app && echo ✅ Container running || echo ❌ Container not running'"
+                    echo === Compressing and uploading project ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=.gitignore --exclude=.DS_Store --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %REMOTE_DIR% && tar -xzf -'"
+
+                    echo ✅ Project uploaded successfully
                     '''
                 }
             }
         }
+
+        stage('Verify Upload') {
+            steps {
+                echo "=== Verifying Files on VPS ==="
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat '''
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'echo === Project Contents === && ls -la %REMOTE_DIR% && echo === && echo Dockerfile: && cat %REMOTE_DIR%/Dockerfile | head -5'"
+                    '''
+                }
+            }
+        }
+
+        stage('Build & Deploy on VPS') {
+            steps {
+                echo "=== Starting Build and Deployment on VPS ==="
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat '''
+                    echo === Executing build and deploy on VPS ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %REMOTE_DIR% && bash vps-deploy.sh'"
+                    '''
+                }
+            }
+        }
+
     }
 
     post {
         always {
-            cleanWs()
+            echo "=========================================="
+            echo "Pipeline execution completed"
+            echo "=========================================="
         }
         success {
             echo "✅ DEPLOYMENT SUCCESSFUL!"
         }
         failure {
-            echo "❌ DEPLOYMENT FAILED - Check SSH key and permissions"
+            echo "❌ DEPLOYMENT FAILED!"
         }
     }
 }
