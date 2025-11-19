@@ -25,13 +25,15 @@ pipeline {
         stage('📤 Upload Project to VPS') {
             steps {
                 echo "Uploading project to VPS..."
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'rm -rf $PROJECT_DIR && mkdir -p $PROJECT_DIR'"
+                    echo === Preparing remote directory ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -v -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'mkdir -p %PROJECT_DIR%'"
 
-                    "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'cd $PROJECT_DIR && tar -xzf -'"
+                    echo === Uploading project files ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %PROJECT_DIR% && tar -xzf -'"
 
-                    echo Upload complete
+                    echo ✅ Project uploaded
                     '''
                 }
             }
@@ -42,7 +44,8 @@ pipeline {
                 echo "Building and deploying on VPS..."
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'cd $PROJECT_DIR && bash vps-deploy.sh'"
+                    echo === Executing deployment script ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'cd %PROJECT_DIR% && bash vps-deploy.sh'"
                     '''
                 }
             }
@@ -53,7 +56,7 @@ pipeline {
                 echo "Verifying deployment..."
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     bat '''
-                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'docker ps | grep icsquiz_user_app'"
+                    "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '%SSH_KEY%' %PROD_USER%@%PROD_HOST% 'docker ps | grep icsquiz_user_app && echo ✅ Container running || echo ❌ Container not running'"
                     '''
                 }
             }
@@ -68,7 +71,7 @@ pipeline {
             echo "✅ DEPLOYMENT SUCCESSFUL!"
         }
         failure {
-            echo "❌ DEPLOYMENT FAILED!"
+            echo "❌ DEPLOYMENT FAILED - Check SSH key and permissions"
         }
     }
 }
