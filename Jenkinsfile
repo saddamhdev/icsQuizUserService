@@ -24,12 +24,17 @@ pipeline {
               withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
 
                   bat """
-                  "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=.idea --exclude=*.iml --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'mkdir -p $REMOTE_DIR && cd $REMOTE_DIR && tar -xzf -'"
-                  """
+                  set SSH_KEY_LINUX=
+                  for /f "delims=" %%i in ('"C:/Program Files/Git/usr/bin/cygpath.exe" "$SSH_KEY"') do set SSH_KEY_LINUX=%%i
 
+                  echo Using SSH Key (Linux Path): %SSH_KEY_LINUX%
+
+                  "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=.idea --exclude=*.iml --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i %SSH_KEY_LINUX% $PROD_USER@$PROD_HOST 'mkdir -p $REMOTE_DIR && cd $REMOTE_DIR && tar -xzf -'"
+                  """
               }
           }
       }
+
 
 
         stage('Verify Remote Files') {
