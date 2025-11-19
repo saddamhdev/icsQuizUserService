@@ -33,6 +33,32 @@ pipeline {
                 }
             }
         }
+        // Add this stage to your Jenkinsfile temporarily to debug
+
+        stage('DEBUG: Check SSH Key') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    bat '''
+                    echo === SSH Key Path ===
+                    echo SSH_KEY=%SSH_KEY%
+
+                    echo === Checking if key file exists ===
+                    if exist "%SSH_KEY%" (
+                        echo ✅ Key file exists
+                        dir "%SSH_KEY%"
+                    ) else (
+                        echo ❌ Key file does NOT exist
+                    )
+
+                    echo === Checking key permissions ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "ls -la '%SSH_KEY%'"
+
+                    echo === Checking key content (first 5 lines) ===
+                    "C:/Program Files/Git/bin/bash.exe" -c "head -5 '%SSH_KEY%'"
+                    '''
+                }
+            }
+        }
 
         stage('Upload Entire Project to VPS') {
             steps {
