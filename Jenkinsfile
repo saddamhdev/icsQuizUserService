@@ -4,9 +4,9 @@ pipeline {
     environment {
         PROD_HOST     = credentials('DO_HOST')
         PROD_USER     = credentials('DO_USER')
-        REMOTE_DIR    = '/www/wwwroot/CITSNVN/devicemanagement'
-        DOCKER_IMAGE  = 'device-management:latest'
-        CONTAINER_NAME = 'device-management-app'
+        REMOTE_DIR    = '/www/wwwroot/CITSNVN/icsQuizUserService'
+        DOCKER_IMAGE  = 'icsquiz-user-service:latest'
+        CONTAINER_NAME = 'icsquiz_user_app'
         PORT          = '3079'
     }
 
