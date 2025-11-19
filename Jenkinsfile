@@ -7,7 +7,7 @@ pipeline {
         REMOTE_DIR    = '/www/wwwroot/CITSNVN/icsQuizUserService'
         DOCKER_IMAGE  = 'icsquiz-user-service:latest'
         CONTAINER_NAME = 'icsquiz_user_app'
-        PORT          = '3079'
+        PORT          = '3090'
     }
 
     stages {
