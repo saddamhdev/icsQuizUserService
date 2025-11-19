@@ -17,32 +17,20 @@ pipeline {
             }
         }
 
-        stage('Upload Full Project to VPS') {
-            steps {
-                echo "=== Uploading Entire Project to VPS ==="
+      stage('Upload Full Project to VPS') {
+          steps {
+              echo "=== Uploading Entire Project to VPS ==="
 
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+              withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
 
-                    bat """
-                    echo === Uploading using SSH + TAR ===
+                  bat """
+                  "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=.idea --exclude=*.iml --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST 'mkdir -p $REMOTE_DIR && cd $REMOTE_DIR && tar -xzf -'"
+                  """
 
-                    "C:/Program Files/Git/bin/bash.exe" -c "
-                        tar -czf - \
-                            --exclude=.git \
-                            --exclude=target \
-                            --exclude=.idea \
-                            --exclude=*.iml \
-                            --exclude=node_modules \
-                            . \
-                        | ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST \\
-                            'mkdir -p $REMOTE_DIR && cd $REMOTE_DIR && tar -xzf -'
-                    "
+              }
+          }
+      }
 
-                    echo ✅ Upload completed successfully
-                    """
-                }
-            }
-        }
 
         stage('Verify Remote Files') {
             steps {
