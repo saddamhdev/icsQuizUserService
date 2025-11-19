@@ -13,7 +13,6 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 git branch: 'main',
-                    credentialsId: 'GITHUB_TOKEN',   // FIXED FOR PRIVATE REPO
                     url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
@@ -29,13 +28,12 @@ pipeline {
         stage('Find Built JAR') {
             steps {
                 script {
-                    // Detect JAR dynamically
-                    JAR_NAME = bat(
-                        script: 'for %i in (target\\*.jar) do @echo %~nxi',
+                    JAR_NAME = powershell(
+                        script: "(Get-ChildItem -Path 'target/*.jar' -File | Select-Object -First 1).Name",
                         returnStdout: true
                     ).trim()
 
-                    echo "🟢 JAR detected: ${JAR_NAME}"
+                    echo "🟢 Detected JAR: ${JAR_NAME}"
                 }
             }
         }
@@ -46,6 +44,7 @@ pipeline {
                     script {
                         bat """
                         "C:/Program Files/Git/bin/bash.exe" -c "
+                        echo 📤 Uploading JAR to server...
                         scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
                         "
                         """
@@ -84,11 +83,11 @@ pipeline {
     }
 
     post {
-        failure {
-            echo "❌ Deployment failed!"
-        }
         success {
-            echo "✅ Deployment success!"
+            echo "✅ Deployment Completed Successfully!"
+        }
+        failure {
+            echo "❌ Deployment Failed!"
         }
     }
 }
