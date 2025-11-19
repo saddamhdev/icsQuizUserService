@@ -2,64 +2,58 @@ pipeline {
     agent any
 
     environment {
-        PROD_HOST  = credentials('DO_HOST')   // your VPS IP stored as Jenkins credential
-        PROD_USER  = credentials('DO_USER')   // your VPS username (root/ubuntu)
-        REMOTE_DIR = '/www/wwwroot/CITSNVN/icsQuizUserService'
+        PROD_HOST  = credentials('DO_HOST')
+        PROD_USER  = credentials('DO_USER')
+        DEPLOY_DIR = '/www/wwwroot/CITSNVN/icsQuizUserService'
+        JAR_NAME   = 'icsQuizUserService-0.1.jar'
+        PORT       = '3090'
     }
 
     stages {
-
         stage('Clone Repository') {
             steps {
-                echo "=== Cloning Repository ==="
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
-                echo "✅ Code pulled successfully"
             }
         }
 
-      stage('Upload Full Project to VPS') {
-          steps {
-              echo "=== Uploading Entire Project to VPS ==="
-
-              withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-
-                  bat """
-                  set SSH_KEY_LINUX=
-                  for /f "delims=" %%i in ('"C:/Program Files/Git/usr/bin/cygpath.exe" "$SSH_KEY"') do set SSH_KEY_LINUX=%%i
-
-                  echo Using SSH Key (Linux Path): %SSH_KEY_LINUX%
-
-                  "C:/Program Files/Git/bin/bash.exe" -c "tar -czf - --exclude=.git --exclude=target --exclude=.idea --exclude=*.iml --exclude=node_modules . | ssh -o StrictHostKeyChecking=no -i %SSH_KEY_LINUX% $PROD_USER@$PROD_HOST 'mkdir -p $REMOTE_DIR && cd $REMOTE_DIR && tar -xzf -'"
-                  """
-              }
-          }
-      }
-
-
-
-        stage('Verify Remote Files') {
+        stage('Build') {
             steps {
-                echo "=== Checking Files on VPS ==="
+                bat 'mvn clean install'
+            }
+        }
 
+        stage('Deploy JAR to Server') {
+            steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-
-                    bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c "
-                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY $PROD_USER@$PROD_HOST \\
-                        'echo === FILES IN REMOTE DIR === && ls -la $REMOTE_DIR'
-                    "
-                    """
+                    script {
+                        bat """
+                        "C:/Program Files/Git/bin/bash.exe" -c "scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}"
+                        """
+                    }
                 }
             }
         }
+
+        stage('Start Spring Boot App (Remote)') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    script {
+                        bat """
+                        "C:/Program Files/Git/bin/bash.exe" -c "ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${PROD_HOST} 'cd ${DEPLOY_DIR}; PID=\$(lsof -t -i:${PORT}); if [ ! -z \$PID ]; then kill -9 \$PID; fi; nohup java -Xms64m -Xmx128m -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &'"
+                        """
+                    }
+                }
+            }
+        }
+
     }
 
     post {
-        success {
-            echo "🎉 Project successfully uploaded to VPS!"
-        }
         failure {
-            echo "❌ Upload failed — check the SSH key or remote directory"
+            echo "❌ Spring Boot deployment failed."
+        }
+        success {
+            echo "✅ Spring Boot deployed successfully."
         }
     }
 }
