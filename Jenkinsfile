@@ -25,6 +25,17 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
+        stage('Check Java Version in Pipeline') {
+            steps {
+                sh '''
+                    which java
+                    java -version
+                    echo JAVA_HOME=$JAVA_HOME
+                    mvn -version
+                '''
+            }
+        }
+
 
         stage('Build') {
             steps {
