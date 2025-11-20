@@ -5,38 +5,28 @@ pipeline {
     }
 
     environment {
-        PROD_HOST  = credentials('DO_HOST')
-        PROD_USER  = credentials('DO_USER')
-        DEPLOY_DIR = '/www/wwwroot/CITSNVN/icsQuizUserService'
-        PORT       = '3090'
+        PROD_HOST = "159.89.172.251"     // manually set
+        PROD_USER = "root"               // manually set
+        DEPLOY_DIR = "/www/wwwroot/CITSNVN/icsQuizUserService"
+        PORT = "3090"
     }
 
     stages {
 
-        stage('Verify Credentials') {
+        stage('Debug Vars') {
             steps {
-                script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                        echo "🟢 All required credentials exist."
-                    }
-                }
+                sh '''
+                    echo HOST=$PROD_HOST
+                    echo USER=$PROD_USER
+                '''
             }
         }
-       stage('Debug Vars') {
-           steps {
-               sh '''
-                   echo HOST=$PROD_HOST
-                   echo USER=$PROD_USER
-               '''
-           }
-       }
 
         stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
-
 
         stage('Build') {
             steps {
@@ -55,14 +45,12 @@ pipeline {
             }
         }
 
-
-
         stage('Upload JAR to VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     sh """
-                    echo 📤 Uploading JAR to ${PROD_HOST}
-                    scp -o StrictHostKeyChecking=no -i $SSH_KEY target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
+                        echo 📤 Uploading JAR to ${PROD_HOST}
+                        scp -o StrictHostKeyChecking=no -i $SSH_KEY target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
                     """
                 }
             }
@@ -72,21 +60,21 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY ${PROD_USER}@${PROD_HOST} << 'EOF'
-                        cd ${DEPLOY_DIR}
+                        ssh -o StrictHostKeyChecking=no -i $SSH_KEY ${PROD_USER}@${PROD_HOST} << 'EOF'
+                            cd ${DEPLOY_DIR}
 
-                        echo 🔍 Checking old process...
-                        OLD_PID=\$(pgrep -f ${JAR_NAME})
-                        if [ ! -z "\$OLD_PID" ]; then
-                            echo 🔴 Killing old PID: \$OLD_PID
-                            kill -9 \$OLD_PID
-                        fi
+                            echo 🔍 Checking old process...
+                            OLD_PID=\$(pgrep -f ${JAR_NAME})
+                            if [ ! -z "\$OLD_PID" ]; then
+                                echo 🔴 Killing old PID: \$OLD_PID
+                                kill -9 \$OLD_PID
+                            fi
 
-                        echo 🚀 Starting app on port ${PORT}
-                        nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
+                            echo 🚀 Starting app on port ${PORT}
+                            nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
 
-                        echo 🟢 App restarted successfully
-                    EOF
+                            echo 🟢 App restarted successfully
+                        EOF
                     """
                 }
             }
