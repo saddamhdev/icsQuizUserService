@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    tools {
+        maven 'maven4'
+    }
 
     environment {
         PROD_HOST  = credentials('DO_HOST')
