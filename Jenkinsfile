@@ -10,9 +10,6 @@ pipeline {
 
     stages {
 
-        /* ----------------------------------------
-           VERIFY REQUIRED CREDENTIALS
-        ------------------------------------------ */
         stage('Verify Required Credentials') {
             steps {
                 script {
@@ -25,45 +22,36 @@ pipeline {
                     requiredCreds.each { cred ->
                         try {
                             if (cred.type == 'ssh') {
-                                withCredentials([sshUserPrivateKey(credentialsId: cred.id, keyFileVariable: 'X')]) {
+                                withCredentials([sshUserPrivateKey(credentialsId: cred.id, keyFileVariable: 'TMP')]) {
                                     echo "🟢 Credential '${cred.id}' exists (SSH Key)"
                                 }
                             } else {
-                                withCredentials([string(credentialsId: cred.id, variable: 'X')]) {
+                                withCredentials([string(credentialsId: cred.id, variable: 'TMP')]) {
                                     echo "🟢 Credential '${cred.id}' exists"
                                 }
                             }
                         } catch (e) {
-                            error("❌ Credential '${cred.id}' NOT FOUND! Add it to Jenkins.")
+                            error("❌ Credential '${cred.id}' NOT FOUND")
                         }
                     }
                 }
             }
         }
 
-        /* ----------------------------------------
-           CLONE REPOSITORY
-        ------------------------------------------ */
         stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
 
-        /* ----------------------------------------
-           BUILD STAGE
-        ------------------------------------------ */
         stage('Build') {
             steps {
                 bat '''mvn clean package -DskipTests'''
-                bat '''echo ===== Showing JAR files in target/ ====='''
+                bat '''echo ===== Showing JAR files ====='''
                 bat '''dir target'''
             }
         }
 
-        /* ----------------------------------------
-           FIND BUILT JAR NAME
-        ------------------------------------------ */
         stage('Find Built JAR') {
             steps {
                 script {
@@ -77,58 +65,64 @@ pipeline {
             }
         }
 
-        /* ----------------------------------------
-           DEPLOY USING SSH-AGENT (NO PATH ISSUES)
-        ------------------------------------------ */
+        /* ------------------------------------------------------------------
+           DEPLOY USING TEMP SSH KEY (WINDOWS FRIENDLY)
+        --------------------------------------------------------------------- */
         stage('Deploy JAR to Server') {
             steps {
-                sshagent(['DO_SSH_KEY']) {
-                    bat '''
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    script {
+                        bat '''
+echo Creating temporary SSH key...
+set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
+
+copy "%SSH_KEY%" "%TEMP_KEY%" >nul
+
 "C:/Program Files/Git/bin/bash.exe" -c "
-    echo 📤 Uploading JAR via ssh-agent...
-    scp -o StrictHostKeyChecking=no target/'"${JAR_NAME}"' ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/'${JAR_NAME}'
+    echo 📤 Uploading JAR...
+    scp -o StrictHostKeyChecking=no -i 'id_rsa_temp' target/'"${JAR_NAME}"' ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/'${JAR_NAME}'
 "
 '''
+                    }
                 }
             }
         }
 
-        /* ----------------------------------------
-           START REMOTE SPRING BOOT APP (CLEAN!)
-        ------------------------------------------ */
+        /* ------------------------------------------------------------------
+           START SPRING BOOT REMOTELY
+        --------------------------------------------------------------------- */
         stage('Start Spring Boot App (Remote)') {
             steps {
-                sshagent(['DO_SSH_KEY']) {
-                    bat '''
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    script {
+                        bat '''
+echo Creating temporary SSH key...
+set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
+
+copy "%SSH_KEY%" "%TEMP_KEY%" >nul
+
 "C:/Program Files/Git/bin/bash.exe" -c "
-    ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
+    ssh -o StrictHostKeyChecking=no -i 'id_rsa_temp' ${PROD_USER}@${PROD_HOST} '
         cd ${DEPLOY_DIR};
 
-        echo 🔍 Checking old process...
         OLD_PID=$(pgrep -f '${JAR_NAME}')
         if [ ! -z "$OLD_PID" ]; then
-            echo 🔴 Killing old PID: $OLD_PID
             kill -9 $OLD_PID
         fi
 
-        echo 🚀 Starting Spring Boot App...
-        nohup java -Xms64m -Xmx128m -jar '${JAR_NAME}' --server.port=${PORT} > app.log 2>&1 &
-
-        echo 🟢 Application Started on port ${PORT}
+        nohup java -jar '${JAR_NAME}' --server.port=${PORT} > app.log 2>&1 &
+        echo App started.
     '
 "
 '''
+                    }
                 }
             }
         }
     }
 
     post {
-        success {
-            echo "✅ Deployment Completed Successfully!"
-        }
-        failure {
-            echo "❌ Deployment Failed!"
-        }
+        success { echo "✅ Deployment Completed Successfully!" }
+        failure { echo "❌ Deployment Failed!" }
     }
 }
