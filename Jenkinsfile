@@ -68,25 +68,30 @@ pipeline {
         /* ------------------------------------------------------------------
            DEPLOY USING TEMP SSH KEY (WINDOWS FRIENDLY)
         --------------------------------------------------------------------- */
-        stage('Deploy JAR to Server') {
-            steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                    script {
-                        bat '''
-echo Creating temporary SSH key...
-set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
+       stage('Deploy JAR to Server') {
+           steps {
+               withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                   script {
 
-copy "%SSH_KEY%" "%TEMP_KEY%" >nul
+                       // Expand JAR_NAME NOW (Groovy)
+                       def jar = JAR_NAME
 
-"C:/Program Files/Git/bin/bash.exe" -c "
-    echo 📤 Uploading JAR...
-    scp -o StrictHostKeyChecking=no -i 'id_rsa_temp' target/'"${JAR_NAME}"' ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/'${JAR_NAME}'
-"
-'''
-                    }
-                }
-            }
-        }
+                       bat """
+       echo Creating temporary SSH key...
+       set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
+       copy \"%SSH_KEY%\" \"%TEMP_KEY%\" >nul
+
+       echo 📤 Uploading JAR...
+
+       \"C:/Program Files/Git/bin/bash.exe\" -c \"
+           scp -o StrictHostKeyChecking=no -i '%TEMP_KEY%' target/${jar} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${jar}
+       \"
+       """
+                   }
+               }
+           }
+       }
+
 
         /* ------------------------------------------------------------------
            START SPRING BOOT REMOTELY
