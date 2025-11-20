@@ -34,7 +34,7 @@ pipeline {
                                 }
                             }
                         } catch (e) {
-                            error("❌ Credential '${cred.id}' NOT FOUND! Please add it in Jenkins Credentials.")
+                            error("❌ Credential '${cred.id}' NOT FOUND! Add it to Jenkins.")
                         }
                     }
                 }
@@ -55,9 +55,9 @@ pipeline {
         ------------------------------------------ */
         stage('Build') {
             steps {
-                bat 'mvn clean package -DskipTests'
-                bat 'echo ===== Showing JAR files in target/ ====='
-                bat 'dir target'
+                bat '''mvn clean package -DskipTests'''
+                bat '''echo ===== Showing JAR files in target/ ====='''
+                bat '''dir target'''
             }
         }
 
@@ -83,41 +83,41 @@ pipeline {
         stage('Deploy JAR to Server') {
             steps {
                 sshagent(['DO_SSH_KEY']) {
-                    bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c "
-                        echo 📤 Uploading JAR via ssh-agent...
-                        scp -o StrictHostKeyChecking=no target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
-                    "
-                    """
+                    bat '''
+"C:/Program Files/Git/bin/bash.exe" -c "
+    echo 📤 Uploading JAR via ssh-agent...
+    scp -o StrictHostKeyChecking=no target/'"${JAR_NAME}"' ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/'${JAR_NAME}'
+"
+'''
                 }
             }
         }
 
         /* ----------------------------------------
-           START REMOTE SPRING BOOT APP
+           START REMOTE SPRING BOOT APP (CLEAN!)
         ------------------------------------------ */
         stage('Start Spring Boot App (Remote)') {
             steps {
                 sshagent(['DO_SSH_KEY']) {
-                    bat """
-                    "C:/Program Files/Git/bin/bash.exe" -c "
-                        ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
-                            cd ${DEPLOY_DIR};
+                    bat '''
+"C:/Program Files/Git/bin/bash.exe" -c "
+    ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
+        cd ${DEPLOY_DIR};
 
-                            echo 🔍 Checking old process...
-                            OLD_PID=\\$(pgrep -f ${JAR_NAME})
-                            if [ ! -z \\\"\\$OLD_PID\\\" ]; then
-                                echo 🔴 Killing old PID: \\$OLD_PID
-                                kill -9 \\$OLD_PID
-                            fi
+        echo 🔍 Checking old process...
+        OLD_PID=$(pgrep -f '${JAR_NAME}')
+        if [ ! -z "$OLD_PID" ]; then
+            echo 🔴 Killing old PID: $OLD_PID
+            kill -9 $OLD_PID
+        fi
 
-                            echo 🚀 Starting Spring Boot App...
-                            nohup java -Xms64m -Xmx128m -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
+        echo 🚀 Starting Spring Boot App...
+        nohup java -Xms64m -Xmx128m -jar '${JAR_NAME}' --server.port=${PORT} > app.log 2>&1 &
 
-                            echo 🟢 Application Started on port ${PORT}
-                        '
-                    "
-                    """
+        echo 🟢 Application Started on port ${PORT}
+    '
+"
+'''
                 }
             }
         }
