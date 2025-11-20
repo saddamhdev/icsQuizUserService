@@ -71,6 +71,19 @@ pipeline {
                 }
             }
         }
+            stage('Show Jenkins Public Key') {
+                steps {
+                    withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            echo "$SSH_KEY" > jenkins_temp_key
+                            chmod 600 jenkins_temp_key
+                            echo "===== PUBLIC KEY START ====="
+                            ssh-keygen -y -f jenkins_temp_key
+                            echo "===== PUBLIC KEY END ====="
+                        '''
+                    }
+                }
+            }
 
         stage('Upload JAR to VPS') {
             steps {
