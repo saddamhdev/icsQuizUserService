@@ -135,7 +135,19 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+
+            <!-- ✅ REQUIRED FOR JAVA 21 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>4.0.0-beta-3</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
+
 
 </project>
