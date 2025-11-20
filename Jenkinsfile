@@ -22,13 +22,21 @@ pipeline {
                 }
             }
         }
+       stage('Debug Vars') {
+           steps {
+               sh '''
+                   echo HOST=$PROD_HOST
+                   echo USER=$PROD_USER
+               '''
+           }
+       }
 
         stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
-        
+
 
         stage('Build') {
             steps {
