@@ -10,6 +10,9 @@ pipeline {
 
     stages {
 
+        /* ---------------------------------------------------------------
+           CHECK ALL REQUIRED CREDENTIALS
+        ----------------------------------------------------------------- */
         stage('Verify Required Credentials') {
             steps {
                 script {
@@ -38,21 +41,30 @@ pipeline {
             }
         }
 
+        /* ---------------------------------------------------------------
+           GIT CLONE
+        ----------------------------------------------------------------- */
         stage('Clone Repository') {
             steps {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
 
+        /* ---------------------------------------------------------------
+           BUILD
+        ----------------------------------------------------------------- */
         stage('Build') {
             steps {
-                bat '''mvn clean package -DskipTests'''
-                bat '''echo ===== Showing JAR files ====='''
-                bat '''dir target'''
+                bat 'mvn clean package -DskipTests'
+                bat 'echo ==== BUILT FILES ===='
+                bat 'dir target'
             }
         }
 
-        stage('Find Built JAR') {
+        /* ---------------------------------------------------------------
+           DETECT OUTPUT JAR
+        ----------------------------------------------------------------- */
+        stage('Detect Built JAR') {
             steps {
                 script {
                     JAR_NAME = powershell(
@@ -60,70 +72,75 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    echo "🟢 Detected JAR: ${JAR_NAME}"
+                    if (!JAR_NAME) {
+                        error("❌ No JAR found in /target. Build failed.")
+                    }
+
+                    echo "🟢 Detected JAR file: ${JAR_NAME}"
                 }
             }
         }
 
-        /* ------------------------------------------------------------------
-           DEPLOY USING TEMP SSH KEY (WINDOWS FRIENDLY)
-        --------------------------------------------------------------------- */
-      stage('Deploy JAR to Server') {
-          steps {
-              withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                  script {
-                      def jar = JAR_NAME
-
-                      bat """
-      echo Creating temporary SSH key...
-      set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
-
-      copy \"%SSH_KEY%\" \"%TEMP_KEY%\" >nul
-
-      echo Converting Windows path to Bash path...
-      for /f \"delims=\" %%i in ('\"C:/Program Files/Git/usr/bin/cygpath.exe\" \"%TEMP_KEY%\"') do set TEMP_KEY_BASH=%%i
-
-      echo Bash key path = %TEMP_KEY_BASH%
-
-      echo 📤 Uploading JAR...
-
-      \"C:/Program Files/Git/bin/bash.exe\" -c \"
-          scp -o StrictHostKeyChecking=no -i \\\"%TEMP_KEY_BASH%\\\" target/${jar} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${jar}
-      \"
-      """
-                  }
-              }
-          }
-      }
-
-
-        /* ------------------------------------------------------------------
-           START SPRING BOOT REMOTELY
-        --------------------------------------------------------------------- */
-        stage('Start Spring Boot App (Remote)') {
+        /* ---------------------------------------------------------------
+           DEPLOY TO VPS USING SCP (WINDOWS + GIT-BASH SAFE)
+        ----------------------------------------------------------------- */
+        stage('Deploy JAR to VPS') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     script {
-                        bat '''
+                        bat """
 echo Creating temporary SSH key...
 set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
 
 copy "%SSH_KEY%" "%TEMP_KEY%" >nul
 
-"C:/Program Files/Git/bin/bash.exe" -c "
-    ssh -o StrictHostKeyChecking=no -i 'id_rsa_temp' ${PROD_USER}@${PROD_HOST} '
-        cd ${DEPLOY_DIR};
+echo Convert Windows path to Bash path...
+for /f \"delims=\" %%i in ('\"C:/Program Files/Git/usr/bin/cygpath.exe\" \"%TEMP_KEY%\"') do set TEMP_KEY_BASH=%%i
 
-        OLD_PID=$(pgrep -f '${JAR_NAME}')
-        if [ ! -z "$OLD_PID" ]; then
-            kill -9 $OLD_PID
-        fi
+echo Bash key path: %TEMP_KEY_BASH%
 
-        nohup java -jar '${JAR_NAME}' --server.port=${PORT} > app.log 2>&1 &
-        echo App started.
-    '
-"
-'''
+echo 📤 Uploading JAR...
+
+\"C:/Program Files/Git/bin/bash.exe\" -c \"
+scp -o StrictHostKeyChecking=no -i '%TEMP_KEY_BASH%' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
+\"
+                        """
+                    }
+                }
+            }
+        }
+
+        /* ---------------------------------------------------------------
+           REMOTE START SPRING BOOT SERVICE
+        ----------------------------------------------------------------- */
+        stage('Restart App on VPS') {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                    script {
+                        bat """
+echo Creating temporary SSH key...
+set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
+copy "%SSH_KEY%" "%TEMP_KEY%" >nul
+
+for /f \"delims=\" %%i in ('\"C:/Program Files/Git/usr/bin/cygpath.exe\" \"%TEMP_KEY%\"') do set TEMP_KEY_BASH=%%i
+
+\"C:/Program Files/Git/bin/bash.exe\" -c \"
+ssh -o StrictHostKeyChecking=no -i '%TEMP_KEY_BASH%' ${PROD_USER}@${PROD_HOST} '
+    cd ${DEPLOY_DIR};
+
+    echo 🔍 Checking old running process...
+    OLD_PID=\\\$(pgrep -f ${JAR_NAME})
+    if [ ! -z "\\\$OLD_PID" ]; then
+        echo 🔴 Killing old process \\\$OLD_PID
+        kill -9 \\\$OLD_PID
+    fi
+
+    echo 🚀 Starting new app...
+    nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
+    echo 🟢 App restarted successfully on port ${PORT}
+'
+\"
+                        """
                     }
                 }
             }
@@ -131,7 +148,7 @@ copy "%SSH_KEY%" "%TEMP_KEY%" >nul
     }
 
     post {
-        success { echo "✅ Deployment Completed Successfully!" }
+        success { echo "✅ Deployment Successful!" }
         failure { echo "❌ Deployment Failed!" }
     }
 }
