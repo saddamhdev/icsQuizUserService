@@ -10,6 +10,36 @@ pipeline {
 
     stages {
 
+        stage('Verify Required Credentials') {
+            steps {
+                script {
+
+                    // List of credentials to verify
+                    def requiredCreds = [
+                        [id: 'DO_HOST',     type: 'string'],
+                        [id: 'DO_USER',     type: 'string'],
+                        [id: 'DO_SSH_KEY',  type: 'ssh']
+                    ]
+
+                    requiredCreds.each { cred ->
+                        try {
+                            if (cred.type == 'ssh') {
+                                withCredentials([sshUserPrivateKey(credentialsId: cred.id, keyFileVariable: 'X')]) {
+                                    echo "🟢 Credential '${cred.id}' exists (SSH key)."
+                                }
+                            } else {
+                                withCredentials([string(credentialsId: cred.id, variable: 'X')]) {
+                                    echo "🟢 Credential '${cred.id}' exists."
+                                }
+                            }
+                        } catch (e) {
+                            error("❌ Credential '${cred.id}' does NOT exist! Add it in Jenkins Credentials.")
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 git branch: 'main',
@@ -71,6 +101,7 @@ pipeline {
 
                             echo 🚀 Starting Spring Boot App...
                             nohup java -Xms64m -Xmx128m -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
+
                             echo 🟢 Application Started on port ${PORT}
                         '
                         "
@@ -79,7 +110,6 @@ pipeline {
                 }
             }
         }
-
     }
 
     post {
