@@ -28,6 +28,21 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
+        stage('Check Compiler Versions') {
+            steps {
+                sh '''
+                    echo "===== JAVA RUNTIME ====="
+                    java -version
+
+                    echo "===== JAVAC COMPILER ====="
+                    javac -version
+
+                    echo "===== ENV PATH ====="
+                    echo $PATH
+                '''
+            }
+        }
+
         stage('Check Java Version in Pipeline') {
             steps {
                 sh '''
