@@ -68,29 +68,33 @@ pipeline {
         /* ------------------------------------------------------------------
            DEPLOY USING TEMP SSH KEY (WINDOWS FRIENDLY)
         --------------------------------------------------------------------- */
-       stage('Deploy JAR to Server') {
-           steps {
-               withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                   script {
+      stage('Deploy JAR to Server') {
+          steps {
+              withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
+                  script {
+                      def jar = JAR_NAME
 
-                       // Expand JAR_NAME NOW (Groovy)
-                       def jar = JAR_NAME
+                      bat """
+      echo Creating temporary SSH key...
+      set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
 
-                       bat """
-       echo Creating temporary SSH key...
-       set TEMP_KEY=%WORKSPACE%\\id_rsa_temp
-       copy \"%SSH_KEY%\" \"%TEMP_KEY%\" >nul
+      copy \"%SSH_KEY%\" \"%TEMP_KEY%\" >nul
 
-       echo 📤 Uploading JAR...
+      echo Converting Windows path to Bash path...
+      for /f \"delims=\" %%i in ('\"C:/Program Files/Git/usr/bin/cygpath.exe\" \"%TEMP_KEY%\"') do set TEMP_KEY_BASH=%%i
 
-       \"C:/Program Files/Git/bin/bash.exe\" -c \"
-           scp -o StrictHostKeyChecking=no -i '%TEMP_KEY%' target/${jar} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${jar}
-       \"
-       """
-                   }
-               }
-           }
-       }
+      echo Bash key path = %TEMP_KEY_BASH%
+
+      echo 📤 Uploading JAR...
+
+      \"C:/Program Files/Git/bin/bash.exe\" -c \"
+          scp -o StrictHostKeyChecking=no -i \\\"%TEMP_KEY_BASH%\\\" target/${jar} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${jar}
+      \"
+      """
+                  }
+              }
+          }
+      }
 
 
         /* ------------------------------------------------------------------
