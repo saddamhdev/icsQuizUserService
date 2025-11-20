@@ -28,32 +28,7 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
-        stage('Check Compiler Versions') {
-            steps {
-                sh '''
-                    echo "===== JAVA RUNTIME ====="
-                    java -version
-
-                    echo "===== JAVAC COMPILER ====="
-                    javac -version
-
-                    echo "===== ENV PATH ====="
-                    echo $PATH
-                '''
-            }
-        }
-
-        stage('Check Java Version in Pipeline') {
-            steps {
-                sh '''
-                    which java
-                    java -version
-                    echo JAVA_HOME=$JAVA_HOME
-                    mvn -version
-                '''
-            }
-        }
-
+        
 
         stage('Build') {
             steps {
@@ -71,21 +46,7 @@ pipeline {
                 }
             }
         }
-           stage('Show Jenkins Public Key') {
-               steps {
-                   withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                       sh '''
-                           # WRITE PRIVATE KEY INTO A FILE SAFELY
-                           printf "%s" "$SSH_KEY" > jenkins_key
-                           chmod 600 jenkins_key
 
-                           echo "===== PUBLIC KEY START ====="
-                           ssh-keygen -y -f jenkins_key
-                           echo "===== PUBLIC KEY END ====="
-                       '''
-                   }
-               }
-           }
 
 
         stage('Upload JAR to VPS') {
