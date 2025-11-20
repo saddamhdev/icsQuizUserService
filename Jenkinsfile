@@ -10,43 +10,49 @@ pipeline {
 
     stages {
 
+        /* ----------------------------------------
+           VERIFY REQUIRED CREDENTIALS
+        ------------------------------------------ */
         stage('Verify Required Credentials') {
             steps {
                 script {
-
-                    // List of credentials to verify
                     def requiredCreds = [
-                        [id: 'DO_HOST',     type: 'string'],
-                        [id: 'DO_USER',     type: 'string'],
-                        [id: 'DO_SSH_KEY',  type: 'ssh']
+                        [id: 'DO_HOST',    type: 'string'],
+                        [id: 'DO_USER',    type: 'string'],
+                        [id: 'DO_SSH_KEY', type: 'ssh']
                     ]
 
                     requiredCreds.each { cred ->
                         try {
                             if (cred.type == 'ssh') {
                                 withCredentials([sshUserPrivateKey(credentialsId: cred.id, keyFileVariable: 'X')]) {
-                                    echo "🟢 Credential '${cred.id}' exists (SSH key)."
+                                    echo "🟢 Credential '${cred.id}' exists (SSH Key)"
                                 }
                             } else {
                                 withCredentials([string(credentialsId: cred.id, variable: 'X')]) {
-                                    echo "🟢 Credential '${cred.id}' exists."
+                                    echo "🟢 Credential '${cred.id}' exists"
                                 }
                             }
                         } catch (e) {
-                            error("❌ Credential '${cred.id}' does NOT exist! Add it in Jenkins Credentials.")
+                            error("❌ Credential '${cred.id}' NOT FOUND! Please add it in Jenkins Credentials.")
                         }
                     }
                 }
             }
         }
 
+        /* ----------------------------------------
+           CLONE REPOSITORY
+        ------------------------------------------ */
         stage('Clone Repository') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/saddamhdev/icsQuizUserService'
+                git branch: 'main', url: 'https://github.com/saddamhdev/icsQuizUserService'
             }
         }
 
+        /* ----------------------------------------
+           BUILD STAGE
+        ------------------------------------------ */
         stage('Build') {
             steps {
                 bat 'mvn clean package -DskipTests'
@@ -55,6 +61,9 @@ pipeline {
             }
         }
 
+        /* ----------------------------------------
+           FIND BUILT JAR NAME
+        ------------------------------------------ */
         stage('Find Built JAR') {
             steps {
                 script {
@@ -68,42 +77,38 @@ pipeline {
             }
         }
 
+        /* ----------------------------------------
+           DEPLOY USING SSH-AGENT (NO PATH ISSUES)
+        ------------------------------------------ */
         stage('Deploy JAR to Server') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                    script {
-                        bat """
-                        echo Creating temp key...
-
-                        set "TEMP_KEY=%WORKSPACE%\\id_rsa_temp"
-                        copy "%SSH_KEY%" "%TEMP_KEY%" >nul
-
-                        echo 📤 Uploading JAR to server...
-
-                        "C:/Program Files/Git/bin/bash.exe" -c "
-                            scp -o StrictHostKeyChecking=no -i '%TEMP_KEY%' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
-                        "
-                        """
-                    }
+                sshagent(['DO_SSH_KEY']) {
+                    bat """
+                    "C:/Program Files/Git/bin/bash.exe" -c "
+                        echo 📤 Uploading JAR via ssh-agent...
+                        scp -o StrictHostKeyChecking=no target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
+                    "
+                    """
                 }
             }
         }
 
-
+        /* ----------------------------------------
+           START REMOTE SPRING BOOT APP
+        ------------------------------------------ */
         stage('Start Spring Boot App (Remote)') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
-                    script {
-                        bat """
-                        "C:/Program Files/Git/bin/bash.exe" -c "
-                        ssh -o StrictHostKeyChecking=no -i '${SSH_KEY}' ${PROD_USER}@${PROD_HOST} '
+                sshagent(['DO_SSH_KEY']) {
+                    bat """
+                    "C:/Program Files/Git/bin/bash.exe" -c "
+                        ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
                             cd ${DEPLOY_DIR};
 
                             echo 🔍 Checking old process...
-                            OLD_PID=\$(pgrep -f ${JAR_NAME})
-                            if [ ! -z \"\$OLD_PID\" ]; then
-                                echo 🔴 Killing old PID: \$OLD_PID
-                                kill -9 \$OLD_PID
+                            OLD_PID=\\$(pgrep -f ${JAR_NAME})
+                            if [ ! -z \\\"\\$OLD_PID\\\" ]; then
+                                echo 🔴 Killing old PID: \\$OLD_PID
+                                kill -9 \\$OLD_PID
                             fi
 
                             echo 🚀 Starting Spring Boot App...
@@ -111,9 +116,8 @@ pipeline {
 
                             echo 🟢 Application Started on port ${PORT}
                         '
-                        "
-                        """
-                    }
+                    "
+                    """
                 }
             }
         }
