@@ -73,15 +73,22 @@ pipeline {
                 withCredentials([sshUserPrivateKey(credentialsId: 'DO_SSH_KEY', keyFileVariable: 'SSH_KEY')]) {
                     script {
                         bat """
-                        "C:/Program Files/Git/bin/bash.exe" -c "
+                        echo Creating temp key...
+
+                        set "TEMP_KEY=%WORKSPACE%\\id_rsa_temp"
+                        copy "%SSH_KEY%" "%TEMP_KEY%" >nul
+
                         echo 📤 Uploading JAR to server...
-                        scp -o StrictHostKeyChecking=no -i '${SSH_KEY}' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
+
+                        "C:/Program Files/Git/bin/bash.exe" -c "
+                            scp -o StrictHostKeyChecking=no -i '%TEMP_KEY%' target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
                         "
                         """
                     }
                 }
             }
         }
+
 
         stage('Start Spring Boot App (Remote)') {
             steps {
