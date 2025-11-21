@@ -5,8 +5,8 @@ pipeline {
     }
 
     environment {
-        PROD_HOST  = "root"
-        PROD_USER  = "159.89.172.251"
+        PROD_USER = "root"                       // FIXED ✔
+        PROD_HOST = "159.89.172.251"            // FIXED ✔
         DEPLOY_DIR = '/www/wwwroot/CITSNVN/icsQuizUserService'
         PORT       = '3090'
     }
@@ -15,12 +15,10 @@ pipeline {
 
         stage('Verify Credentials') {
             steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
-                                                     usernameVariable: 'SSH_USER',
-                                                     passwordVariable: 'SSH_PASS')]) {
-                        echo "🟢 All required credentials exist."
-                    }
+                withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
+                                                 usernameVariable: 'SSH_USER',
+                                                 passwordVariable: 'SSH_PASS')]) {
+                    echo "🟢 Credentials are OK."
                 }
             }
         }
@@ -51,7 +49,11 @@ pipeline {
         stage('Detect Built JAR') {
             steps {
                 script {
-                    JAR_NAME = sh(script: "ls target/*.jar | head -n 1 | xargs -n 1 basename", returnStdout: true).trim()
+                    JAR_NAME = sh(
+                        script: "ls target/*.jar | head -n 1 | xargs -n 1 basename",
+                        returnStdout: true
+                    ).trim()
+
                     echo "🟢 Detected JAR: ${JAR_NAME}"
                 }
             }
@@ -63,12 +65,12 @@ pipeline {
                                                  usernameVariable: 'SSH_USER',
                                                  passwordVariable: 'SSH_PASS')]) {
 
-                    sh """
-                        echo 📤 Uploading JAR to ${PROD_HOST}...
+                    sh(label: "Upload JAR", script: '''
+                        echo "📤 Uploading JAR to server..."
 
                         sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
-                            target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
-                    """
+                            target/'"${JAR_NAME}"' $PROD_USER@$PROD_HOST:$DEPLOY_DIR/'"${JAR_NAME}"'
+                    ''')
                 }
             }
         }
@@ -79,31 +81,30 @@ pipeline {
                                                  usernameVariable: 'SSH_USER',
                                                  passwordVariable: 'SSH_PASS')]) {
 
-                    sh """
-                        echo 🔄 Restarting app on server...
+                    sh(label: "Restart App", script: '''
+                        echo "🔄 Restarting app on VPS..."
 
-                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'EOF'
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $PROD_USER@$PROD_HOST << EOF
 
-                            cd ${DEPLOY_DIR}
+                            cd '"$DEPLOY_DIR"'
 
-                            echo 🔍 Checking old process...
-                            OLD_PID=\$(pgrep -f ${JAR_NAME})
+                            echo "🔍 Checking old process..."
+                            OLD_PID=\$(pgrep -f '"$JAR_NAME"')
 
                             if [ ! -z "\$OLD_PID" ]; then
-                                echo 🔴 Killing old PID: \$OLD_PID
+                                echo "🔴 Killing old PID: \$OLD_PID"
                                 kill -9 \$OLD_PID
                             else
-                                echo 🟡 No running instance found
+                                echo "🟡 No running instance found"
                             fi
 
-                            echo 🚀 Starting new app on port ${PORT}
+                            echo "🚀 Starting app on port '"$PORT"'"
+                            nohup java -jar '"$JAR_NAME"' --server.port='"$PORT"' > app.log 2>&1 &
 
-                            nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
-
-                            echo 🟢 App restarted successfully
+                            echo "🟢 App restarted successfully"
 
                         EOF
-                    """
+                    ''')
                 }
             }
         }
