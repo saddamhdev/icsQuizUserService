@@ -85,6 +85,12 @@ pipeline {
                         )
                     ]) {
 
+                        echo 'Loading global environment...';
+
+                        set -a
+                        source /www/wwwroot/CITSNVN/global.env
+                        set +a
+
                         sh 'echo "Restarting app on VPS..."'
 
                         // 1. Kill old process
@@ -99,11 +105,20 @@ pipeline {
                             chmod -R 777 ${DEPLOY_DIR}
                         """
 
-                        // 3. Start new process
-                        sh """
-                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &"
-                        """
+                        // 3. Start new process (THIS IS WHERE WE LOAD YOUR ENV FILE)
+                            sh """
+                                sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
+                                    echo "Loading global environment..."
+                                    set -a
+                                    source /www/wwwroot/CITSNVN/global.env
+                                    set +a
+
+                                    echo "Starting Spring Boot app..."
+                                    nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} \\
+                                        --server.port=${PORT} \\
+                                        >> ${DEPLOY_DIR}/app.log 2>&1 &
+                                '
+                            """
 
                         // 4. Confirm running
                         sh """
