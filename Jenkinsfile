@@ -102,8 +102,12 @@ pipeline {
 
                         // 3. Start new process with global.env
                         sh """
-                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "source ${GLOBAL_ENV} && nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &" < /dev/null
+                            sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "echo 'Loading global environment...' && \
+                            set -a && \
+                            source ${GLOBAL_ENV} && \
+                            set +a && \
+                            nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &"
                         """
 
                         // 4. Confirm running
