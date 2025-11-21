@@ -93,9 +93,9 @@ pipeline {
                         else echo '⚠️  Database port not responding - check configuration'; fi"
 
                         echo ""
-                        echo "🔍 Testing PostgreSQL connection..."
+                        echo "🔍 Testing port response with timeout..."
                         sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                        "psql -h localhost -U postgres -d postgres -c 'SELECT version();' 2>/dev/null || echo '⚠️  Could not connect - check PostgreSQL credentials'" || true
+                        "timeout 3 bash -c 'echo > /dev/tcp/localhost/5432' 2>/dev/null && echo '✅ Port 5432 accepts connections' || echo '⚠️  Port 5432 not responding to TCP connection'"
                     '''
                 }
             }
@@ -127,13 +127,15 @@ pipeline {
                             chmod 644 ${DEPLOY_DIR}/*.sh 2>/dev/null || true"
                         '''
 
-                        // 3. Create startup script on VPS
+                        // 3. Create startup script on VPS with proper environment export
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << SCRIPT
-echo "📝 Creating startup script..."
+echo "📝 Creating startup script with environment variables..."
 cat > /www/wwwroot/CITSNVN/icsQuizUserService/start.sh << 'EOF'
 #!/bin/bash
+set -a
 source /www/wwwroot/CITSNVN/global.env
+set +a
 java -jar /www/wwwroot/CITSNVN/icsQuizUserService/${JAR_NAME} --server.port=3090 >> /www/wwwroot/CITSNVN/icsQuizUserService/app.log 2>&1
 EOF
 chmod 755 /www/wwwroot/CITSNVN/icsQuizUserService/start.sh
@@ -179,6 +181,18 @@ SCRIPT
                                 echo "⚠️  Checking database status from health endpoint..."
                                 curl -s http://${PROD_HOST}:${PORT}/actuator/health || echo "Application still starting..."
                             fi
+                        '''
+
+                        // 8. Check database status from VPS actuator endpoint
+                        sh '''
+                            echo ""
+                            echo "🗄️  Checking database health from VPS..."
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "echo 'Database Status:' && \
+                            curl -s http://localhost:${PORT}/actuator/health/db 2>/dev/null || echo '⚠️  Database health endpoint not available' && \
+                            echo '' && \
+                            echo 'Full Health Report:' && \
+                            curl -s http://localhost:${PORT}/actuator/health 2>/dev/null | head -50 || echo '⚠️  Health endpoint not responding'"
                         '''
                     }
                 }
