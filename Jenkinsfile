@@ -194,6 +194,16 @@ SCRIPT
                             echo 'Full Health Report:' && \
                             curl -s http://localhost:${PORT}/actuator/health 2>/dev/null | head -50 || echo '⚠️  Health endpoint not responding'"
                         '''
+
+                         // 9. Open firewall port for application
+                            sh '''
+                                echo ""
+                                echo "🔓 Opening firewall port ${PORT}..."
+                                sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                                "sudo ufw allow ${PORT} && \
+                                sudo ufw reload && \
+                                echo '✅ Firewall port ${PORT} opened successfully'"
+                            '''
                     }
                 }
             }
