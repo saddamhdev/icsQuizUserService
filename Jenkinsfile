@@ -103,25 +103,37 @@ pipeline {
                         // 3. Create startup script on VPS
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'SCRIPT'
+echo "📝 Creating startup script..."
 cat > ${DEPLOY_DIR}/start.sh << 'EOF'
 #!/bin/bash
 source ${GLOBAL_ENV}
 java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
 EOF
 chmod +x ${DEPLOY_DIR}/start.sh
+echo "✅ Startup script created at ${DEPLOY_DIR}/start.sh"
 SCRIPT
                         '''
 
                         // 4. Start new process using the script
                         sh '''
+                            echo "🚀 Starting application..."
                             sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             "nohup bash ${DEPLOY_DIR}/start.sh > /dev/null 2>&1 &"
+                            echo "⏳ Waiting for application to start..."
+                            sleep 2
                         '''
 
                         // 5. Confirm running
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             pgrep -f "icsQuizUserService" && echo started || echo failed
+                        '''
+
+                        // 6. Display last 20 lines of log
+                        sh '''
+                            echo "📋 Last 20 lines of application log:"
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "tail -20 ${DEPLOY_DIR}/app.log"
                         '''
                     }
                 }
