@@ -75,38 +75,42 @@ pipeline {
            }
        }
 
-   stage('Restart App on VPS') {
-       steps {
-           withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
-                                            usernameVariable: 'SSH_USER',
-                                            passwordVariable: 'SSH_PASS')]) {
+  stage('Restart App on VPS') {
+      steps {
+          withCredentials([
+              usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
+                               usernameVariable: 'SSH_USER',
+                               passwordVariable: 'SSH_PASS')
+          ]) {
 
-               sh '''
-                   echo "🔄 Restarting app on VPS..."
-               '''
-   
-                           sh '''#!/bin/bash
+              script {
+                  def CMD = """
+  cd ${DEPLOY_DIR}
 
-               SSH_HOST=''' + "${PROD_USER}@${PROD_HOST}" + '''
+  echo '🔍 Checking old process...'
+  OLD_PID=\$(pgrep -f ${JAR_NAME})
+  if [ -n "\$OLD_PID" ]; then
+      echo '🔴 Killing old PID:' \$OLD_PID
+      kill -9 \$OLD_PID
+  else
+      echo '🟡 No running instance found'
+  fi
 
-               sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $SSH_HOST "
-                   cd ${DEPLOY_DIR};
-                   echo '🔍 Checking old process...';
-                   OLD_PID=\$(pgrep -f ${JAR_NAME});
-                   if [ -n \"\$OLD_PID\" ]; then
-                       echo '🔴 Killing old PID: '\$OLD_PID'';
-                       kill -9 \$OLD_PID;
-                   else
-                       echo '🟡 No running instance found';
-                   fi;
-                   echo '🚀 Starting app on port ${PORT}';
-                   nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &;
-                   echo '🟢 App restarted successfully';
-               "
-               '''
-                       }
-                   }
-               }
+  echo '🚀 Starting app on port ${PORT}'
+  nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
+
+  echo '🟢 App restarted successfully'
+  """
+
+                  sh """
+                      echo '🔄 Restarting app on VPS...'
+                      sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '${CMD}'
+                  """
+              }
+          }
+      }
+  }
+
 
 
     }
