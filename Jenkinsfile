@@ -59,21 +59,21 @@ pipeline {
             }
         }
 
-        stage('Upload JAR to VPS') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
-                                                 usernameVariable: 'SSH_USER',
-                                                 passwordVariable: 'SSH_PASS')]) {
+       stage('Upload JAR to VPS') {
+           steps {
+               withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
+                                                usernameVariable: 'SSH_USER',
+                                                passwordVariable: 'SSH_PASS')]) {
 
-                    sh(label: "Upload JAR", script: '''
-                        echo "📤 Uploading JAR to server..."
+                   sh """
+                       echo "📤 Uploading JAR to server..."
 
-                        sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
-                            target/'"${JAR_NAME}"' $PROD_USER@$PROD_HOST:$DEPLOY_DIR/'"${JAR_NAME}"'
-                    ''')
-                }
-            }
-        }
+                       sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
+                           target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
+                   """
+               }
+           }
+       }
 
         stage('Restart App on VPS') {
             steps {
