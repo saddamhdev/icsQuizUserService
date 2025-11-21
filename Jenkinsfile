@@ -102,7 +102,7 @@ pipeline {
 
                         // 3. Create startup script on VPS
                         sh '''
-                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'SCRIPT'
+                            sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'SCRIPT'
 cat > ${DEPLOY_DIR}/start.sh << 'EOF'
 #!/bin/bash
 source ${GLOBAL_ENV}
