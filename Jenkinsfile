@@ -50,12 +50,12 @@ pipeline {
         stage('Detect Built JAR') {
             steps {
                 script {
-                    JAR_NAME = sh(
+                    env.JAR_NAME = sh(
                         script: "ls target/*.jar | head -n 1 | xargs -n 1 basename",
                         returnStdout: true
                     ).trim()
 
-                    echo "🟢 Detected JAR: ${JAR_NAME}"
+                    echo "🟢 Detected JAR: ${env.JAR_NAME}"
                 }
             }
         }
@@ -91,7 +91,7 @@ pipeline {
                         // 1. Kill old process
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            pkill -f ${JAR_NAME} || echo no-process
+                            pkill -f "icsQuizUserService" || echo no-process
                         '''
 
                         // 2. Fix directory permissions BEFORE starting app
@@ -110,7 +110,7 @@ pipeline {
                         // 4. Confirm running
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            pgrep -f ${JAR_NAME} && echo started || echo failed
+                            pgrep -f "icsQuizUserService" && echo started || echo failed
                         '''
                     }
                 }
