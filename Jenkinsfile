@@ -75,35 +75,44 @@ pipeline {
            }
        }
 
-              stage('Restart App on VPS') {
-                  steps {
-                      withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
-                                                       usernameVariable: 'SSH_USER',
-                                                       passwordVariable: 'SSH_PASS')]) {
+            stage('Restart App on VPS') {
+                steps {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'DO_SSH_PASSWORD',
+                            usernameVariable: 'SSH_USER',
+                            passwordVariable: 'SSH_PASS'
+                        )
+                    ]) {
 
-                          sh 'echo "Restarting app on VPS..."'
+                        sh 'echo "Restarting app on VPS..."'
 
-                          // 1. Kill old process
-                          sh """
-                              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                              pkill -f ${JAR_NAME} || echo no-process
-                          """
+                        // 1. Kill old process
+                        sh """
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            pkill -f ${JAR_NAME} || echo no-process
+                        """
 
-                          // 2. Start new process
-                          sh """
-                              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                              nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} > ${DEPLOY_DIR}/app.log 2>&1 &
-                          """
+                        // 2. Fix directory permissions BEFORE starting app
+                        sh """
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            chmod -R 777 ${DEPLOY_DIR}
+                        """
 
-                          // 3. Confirm running
-                          sh """
-                              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                              pgrep -f ${JAR_NAME} && echo started || echo failed
-                          """
-                      }
-                  }
-              }
+                        // 3. Start new process
+                        sh """
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &"
+                        """
 
+                        // 4. Confirm running
+                        sh """
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            pgrep -f ${JAR_NAME} && echo started || echo failed
+                        """
+                    }
+                }
+            }
 
 
 
