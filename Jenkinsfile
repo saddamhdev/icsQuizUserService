@@ -81,15 +81,15 @@ pipeline {
                                                  usernameVariable: 'SSH_USER',
                                                  passwordVariable: 'SSH_PASS')]) {
 
-                    sh(label: "Restart App", script: '''
+                    sh """
                         echo "🔄 Restarting app on VPS..."
 
-                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $PROD_USER@$PROD_HOST << EOF
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $PROD_USER@$PROD_HOST << 'EOF'
 
-                            cd '"$DEPLOY_DIR"'
+                            cd ${DEPLOY_DIR}
 
                             echo "🔍 Checking old process..."
-                            OLD_PID=\$(pgrep -f '"$JAR_NAME"')
+                            OLD_PID=\$(pgrep -f ${JAR_NAME})
 
                             if [ ! -z "\$OLD_PID" ]; then
                                 echo "🔴 Killing old PID: \$OLD_PID"
@@ -98,16 +98,17 @@ pipeline {
                                 echo "🟡 No running instance found"
                             fi
 
-                            echo "🚀 Starting app on port '"$PORT"'"
-                            nohup java -jar '"$JAR_NAME"' --server.port='"$PORT"' > app.log 2>&1 &
+                            echo "🚀 Starting app on port ${PORT}"
+                            nohup java -jar ${JAR_NAME} --server.port=${PORT} > app.log 2>&1 &
 
                             echo "🟢 App restarted successfully"
 
                         EOF
-                    ''')
+                    """
                 }
             }
         }
+
     }
 
     post {
