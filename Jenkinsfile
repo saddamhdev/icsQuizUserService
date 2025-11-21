@@ -66,12 +66,12 @@ pipeline {
                                                 usernameVariable: 'SSH_USER',
                                                 passwordVariable: 'SSH_PASS')]) {
 
-                   sh """
+                   sh '''
                        echo "📤 Uploading JAR to server..."
 
                        sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
                            target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
-                   """
+                   '''
                }
            }
        }
@@ -89,35 +89,32 @@ pipeline {
                         sh 'echo "Restarting app on VPS..."'
 
                         // 1. Kill old process
-                        sh """
+                        sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             pkill -f ${JAR_NAME} || echo no-process
-                        """
+                        '''
 
                         // 2. Fix directory permissions BEFORE starting app
-                        sh """
+                        sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             chmod -R 777 ${DEPLOY_DIR}
-                        """
+                        '''
 
                         // 3. Start new process with global.env
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             "cd ${DEPLOY_DIR} && echo 'Loading global environment...' && \
-                            nohup env \$(cat ${GLOBAL_ENV} | xargs) java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &"
+                            nohup bash -c 'source ${GLOBAL_ENV} && java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT}' >> ${DEPLOY_DIR}/app.log 2>&1 &"
                         '''
 
                         // 4. Confirm running
-                        sh """
+                        sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             pgrep -f ${JAR_NAME} && echo started || echo failed
-                        """
+                        '''
                     }
                 }
             }
-
-
-
 
     }
 
