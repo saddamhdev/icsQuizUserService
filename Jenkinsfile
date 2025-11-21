@@ -85,45 +85,39 @@ pipeline {
                         )
                     ]) {
 
-                        echo 'Loading global environment...';
-
-                        set -a
-                        source /www/wwwroot/CITSNVN/global.env
-                        set +a
-
                         sh 'echo "Restarting app on VPS..."'
 
                         // 1. Kill old process
                         sh """
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            pkill -f ${JAR_NAME} || echo no-process
+                            "pkill -f ${JAR_NAME} || echo no-process"
                         """
 
                         // 2. Fix directory permissions BEFORE starting app
                         sh """
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            chmod -R 777 ${DEPLOY_DIR}
+                            "chmod -R 777 ${DEPLOY_DIR}"
                         """
 
                         // 3. Start new process (THIS IS WHERE WE LOAD YOUR ENV FILE)
-                            sh """
-                                sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
-                                    echo "Loading global environment..."
-                                    set -a
-                                    source /www/wwwroot/CITSNVN/global.env
-                                    set +a
+                        sh """
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
+                                echo "Loading global environment..."
+                                set -a
+                                source /www/wwwroot/CITSNVN/global.env
+                                set +a
 
-                                    echo "Starting Spring Boot app..."
-                                    nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} \\
-                                        --server.port=${PORT} \\
-                                        >> ${DEPLOY_DIR}/app.log 2>&1 &
-                                '
-                            """
+                                echo "Starting Spring Boot app..."
+                                nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} \\
+                                    --server.port=${PORT} \\
+                                    >> ${DEPLOY_DIR}/app.log 2>&1 &
+                            '
+                        """
 
                         // 4. Confirm running
                         sh """
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            pgrep -f ${JAR_NAME} && echo started || echo failed
+                            "pgrep -f ${JAR_NAME} && echo started || echo failed"
                         """
                     }
                 }
