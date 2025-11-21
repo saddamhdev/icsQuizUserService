@@ -102,19 +102,20 @@ pipeline {
 
                         // 3. Create startup script on VPS
                         sh '''
-                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "cat > ${DEPLOY_DIR}/start.sh << 'EOF'
-                            #!/bin/bash
-                            source ${GLOBAL_ENV}
-                            java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
-                            EOF
-                            chmod +x ${DEPLOY_DIR}/start.sh"
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'SCRIPT'
+cat > ${DEPLOY_DIR}/start.sh << 'EOF'
+#!/bin/bash
+source ${GLOBAL_ENV}
+java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
+EOF
+chmod +x ${DEPLOY_DIR}/start.sh
+SCRIPT
                         '''
 
                         // 4. Start new process using the script
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "nohup ${DEPLOY_DIR}/start.sh &" < /dev/null
+                            "nohup bash ${DEPLOY_DIR}/start.sh > /dev/null 2>&1 &"
                         '''
 
                         // 5. Confirm running
