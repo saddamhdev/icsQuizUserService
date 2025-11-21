@@ -131,18 +131,18 @@ pipeline {
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << SCRIPT
 echo "📝 Creating startup script with environment variables..."
-cat > /www/wwwroot/CITSNVN/icsQuizUserService/start.sh << 'EOF'
+cat > ${DEPLOY_DIR}/start.sh << 'EOF'
 #!/bin/bash
 set -a
-source /www/wwwroot/CITSNVN/global.env
+source ${GLOBAL_ENV}
 set +a
-java -jar /www/wwwroot/CITSNVN/icsQuizUserService/${JAR_NAME} --server.port=3090 >> /www/wwwroot/CITSNVN/icsQuizUserService/app.log 2>&1
+java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
 EOF
-chmod 755 /www/wwwroot/CITSNVN/icsQuizUserService/start.sh
-touch /www/wwwroot/CITSNVN/icsQuizUserService/app.log 2>/dev/null || true
-chmod 644 /www/wwwroot/CITSNVN/icsQuizUserService/app.log
+chmod 755 ${DEPLOY_DIR}/start.sh
+touch ${DEPLOY_DIR}/app.log 2>/dev/null || true
+chmod 644 ${DEPLOY_DIR}/app.log
 echo "✅ Startup script created with proper permissions"
-ls -lah /www/wwwroot/CITSNVN/icsQuizUserService/ | grep -E 'start.sh|app.log|jar'
+ls -lah ${DEPLOY_DIR} | grep -E 'start.sh|app.log|jar'
 SCRIPT
                         '''
 
@@ -195,15 +195,15 @@ SCRIPT
                             curl -s http://localhost:${PORT}/actuator/health 2>/dev/null | head -50 || echo '⚠️  Health endpoint not responding'"
                         '''
 
-                         // 9. Open firewall port for application
-                            sh '''
-                                echo ""
-                                echo "🔓 Opening firewall port ${PORT}..."
-                                sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                                "sudo ufw allow ${PORT} && \
-                                sudo ufw reload && \
-                                echo '✅ Firewall port ${PORT} opened successfully'"
-                            '''
+                        // 9. Open firewall port for application
+                        sh '''
+                            echo ""
+                            echo "🔓 Opening firewall port ${PORT}..."
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "sudo ufw allow ${PORT} && \
+                            sudo ufw reload && \
+                            echo '✅ Firewall port ${PORT} opened successfully'"
+                        '''
                     }
                 }
             }
