@@ -76,64 +76,56 @@ pipeline {
            }
        }
 
-           stage('Restart App on VPS') {
-               steps {
-                   withCredentials([
-                       usernamePassword(
-                           credentialsId: 'DO_SSH_PASSWORD',
-                           usernameVariable: 'SSH_USER',
-                           passwordVariable: 'SSH_PASS'
-                       )
-                   ]) {
+            stage('Restart App on VPS') {
+                steps {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'DO_SSH_PASSWORD',
+                            usernameVariable: 'SSH_USER',
+                            passwordVariable: 'SSH_PASS'
+                        )
+                    ]) {
 
-                       sh 'echo "Restarting app on VPS..."'
+                        sh 'echo "Restarting app on VPS..."'
 
-                       // 1. Kill old process
-                       sh """
-                           sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                           'pkill -f ${JAR_NAME} || echo no-process'
-                       """
+                        // 1. Kill old process
+                        sh '''
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            pkill -f "icsQuizUserService" || echo no-process
+                        '''
 
-                       // 2. Fix directory permissions BEFORE starting app
-                       sh """
-                           sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                           'chmod -R 755 ${DEPLOY_DIR}'
-                       """
+                        // 2. Fix directory permissions BEFORE starting app
+                        sh '''
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            chmod -R 777 ${DEPLOY_DIR}
+                        '''
 
-                       // 3. Create startup script on VPS
-                       sh """
-                           sshpass -p '$SSH_PASS' ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} <<EOF
-           cat > ${DEPLOY_DIR}/start.sh <<'SCRIPT'
-           #!/bin/bash
-           set -a
-           source ${GLOBAL_ENV}
-           set +a
-           nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &
-           SCRIPT
-           EOF
-                       """
+                        // 3. Create startup script on VPS
+                        sh '''
+                            sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'SCRIPT'
+cat > ${DEPLOY_DIR}/start.sh << 'EOF'
+#!/bin/bash
+source ${GLOBAL_ENV}
+java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
+EOF
+chmod +x ${DEPLOY_DIR}/start.sh
+SCRIPT
+                        '''
 
-                       // 4. Make it executable
-                       sh """
-                           sshpass -p '$SSH_PASS' ssh ${PROD_USER}@${PROD_HOST} 'chmod +x ${DEPLOY_DIR}/start.sh'
-                       """
+                        // 4. Start new process using the script
+                        sh '''
+                            sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "nohup bash ${DEPLOY_DIR}/start.sh > /dev/null 2>&1 &"
+                        '''
 
-                       // 5. Start the app
-                       sh """
-                           sshpass -p '$SSH_PASS' ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                           "nohup bash ${DEPLOY_DIR}/start.sh > /dev/null 2>&1 &"
-                       """
-
-                       // 6. Confirm running
-                       sh """
-                           sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                           'pgrep -f ${JAR_NAME} && echo started || echo failed'
-                       """
-                   }
-               }
-           }
-
-
+                        // 5. Confirm running
+                        sh '''
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            pgrep -f "icsQuizUserService" && echo started || echo failed
+                        '''
+                    }
+                }
+            }
 
     }
 
