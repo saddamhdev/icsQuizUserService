@@ -75,25 +75,32 @@ pipeline {
                }
            }
        }
-         stage('Check Database Status') {
-                    steps {
-                        withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
-                                                        usernameVariable: 'SSH_USER',
-                                                        passwordVariable: 'SSH_PASS')]) {
 
-                            sh '''
-                                echo "🗄️  Checking database connectivity..."
+        stage('Check Database Status') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
+                                                usernameVariable: 'SSH_USER',
+                                                passwordVariable: 'SSH_PASS')]) {
 
-                                # Try to connect to database (adjust host/port as needed)
-                                sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                                "if nc -z localhost 5432 2>/dev/null; then echo '✅ PostgreSQL is running on port 5432'; \
-                                elif nc -z localhost 3306 2>/dev/null; then echo '✅ MySQL is running on port 3306'; \
-                                elif nc -z localhost 27017 2>/dev/null; then echo '✅ MongoDB is running on port 27017'; \
-                                else echo '⚠️  Database port not responding - check configuration'; fi"
-                            '''
-                        }
-                    }
+                    sh '''
+                        echo "🗄️  Checking database connectivity..."
+
+                        # Try to connect to database (adjust host/port as needed)
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                        "if nc -z localhost 5432 2>/dev/null; then echo '✅ PostgreSQL is running on port 5432'; \
+                        elif nc -z localhost 3306 2>/dev/null; then echo '✅ MySQL is running on port 3306'; \
+                        elif nc -z localhost 27017 2>/dev/null; then echo '✅ MongoDB is running on port 27017'; \
+                        else echo '⚠️  Database port not responding - check configuration'; fi"
+
+                        echo ""
+                        echo "🔍 Testing PostgreSQL connection..."
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                        "psql -h localhost -U postgres -d postgres -c 'SELECT version();' 2>/dev/null || echo '⚠️  Could not connect - check PostgreSQL credentials'" || true
+                    '''
                 }
+            }
+        }
+
             stage('Restart App on VPS') {
                 steps {
                     withCredentials([
@@ -159,6 +166,19 @@ SCRIPT
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             "tail -30 ${DEPLOY_DIR}/app.log || echo 'Log file not available yet'"
                             echo "=================================="
+                        '''
+
+                        // 7. Check application health endpoint
+                        sh '''
+                            echo "🏥 Checking application health status..."
+                            sleep 3
+                            if curl -s http://${PROD_HOST}:${PORT}/actuator/health | grep -q "UP"; then
+                                echo "✅ Application is UP and healthy"
+                                curl -s http://${PROD_HOST}:${PORT}/actuator/health | head -20
+                            else
+                                echo "⚠️  Checking database status from health endpoint..."
+                                curl -s http://${PROD_HOST}:${PORT}/actuator/health || echo "Application still starting..."
+                            fi
                         '''
                     }
                 }
