@@ -97,7 +97,9 @@ pipeline {
                         // 2. Fix directory permissions BEFORE starting app
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            chmod -R 777 ${DEPLOY_DIR}
+                            "chmod -R 755 ${DEPLOY_DIR} && \
+                            chmod 644 ${DEPLOY_DIR}/*.jar && \
+                            chmod 644 ${DEPLOY_DIR}/*.sh"
                         '''
 
                         // 3. Create startup script on VPS
@@ -110,9 +112,10 @@ source /www/wwwroot/CITSNVN/global.env
 java -jar /www/wwwroot/CITSNVN/icsQuizUserService/${JAR_NAME} --server.port=3090 >> /www/wwwroot/CITSNVN/icsQuizUserService/app.log 2>&1
 EOF
 chmod 755 /www/wwwroot/CITSNVN/icsQuizUserService/start.sh
-touch /www/wwwroot/CITSNVN/icsQuizUserService/app.log
-chmod 666 /www/wwwroot/CITSNVN/icsQuizUserService/app.log
-echo "✅ Startup script created at /www/wwwroot/CITSNVN/icsQuizUserService/start.sh"
+touch /www/wwwroot/CITSNVN/icsQuizUserService/app.log 2>/dev/null || true
+chmod 644 /www/wwwroot/CITSNVN/icsQuizUserService/app.log
+echo "✅ Startup script created with proper permissions"
+ls -lah /www/wwwroot/CITSNVN/icsQuizUserService/ | grep -E 'start.sh|app.log|jar'
 SCRIPT
                         '''
 
@@ -131,11 +134,13 @@ SCRIPT
                             pgrep -f "icsQuizUserService" && echo started || echo failed
                         '''
 
-                        // 6. Display last 20 lines of log
+                        // 6. Display last lines of log
                         sh '''
-                            echo "📋 Last 20 lines of application log:"
+                            echo "📋 Application Log (Last 30 lines):"
+                            echo "=================================="
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "tail -20 ${DEPLOY_DIR}/app.log || echo 'Log file will be created on first run'"
+                            "tail -30 ${DEPLOY_DIR}/app.log || echo 'Log file not available yet'"
+                            echo "=================================="
                         '''
                     }
                 }
