@@ -75,47 +75,43 @@ pipeline {
            }
        }
 
-        stage('Restart App on VPS') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'DO_SSH_PASSWORD',
-                        usernameVariable: 'SSH_USER',
-                        passwordVariable: 'SSH_PASS'
-                    )
-                ]) {
+       stage('Restart App on VPS') {
+           steps {
+               withCredentials([
+                   usernamePassword(
+                       credentialsId: 'DO_SSH_PASSWORD',
+                       usernameVariable: 'SSH_USER',
+                       passwordVariable: 'SSH_PASS'
+                   )
+               ]) {
 
-                    sh 'echo "Restarting app on VPS..."'
+                   sh 'echo "Restarting app on VPS..."'
 
-                    // 1. Kill old process
-                    sh """
-                        sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                        'pkill -f ${JAR_NAME} || echo no-process'
-                    """
+                   // 1. Kill old process
+                   sh """
+                       sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} 'pkill -f ${JAR_NAME} || echo no-process'
+                   """
 
-                    // 2. Start new process with environment
-                    sh """
-                        sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
-                            echo "Loading global environment..."
-                            set -a
-                            source /www/wwwroot/CITSNVN/global.env
-                            set +a
+                   // 2. Start new process with environment
+                   sh """
+                       sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} '
+                           echo "Loading global environment..."
+                           set -a
+                           source /www/wwwroot/CITSNVN/global.env
+                           set +a
 
-                            echo "Starting Spring Boot App..."
-                            nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} \
-                                --server.port=${PORT} \
-                                >> ${DEPLOY_DIR}/app.log 2>&1 &
-                        '
-                    """
+                           echo "Starting Spring Boot App..."
+                           nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1 &
+                       '
+                   """
 
-                    // 3. Confirm running
-                    sh """
-                        sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                        'pgrep -f ${JAR_NAME} && echo started || echo failed'
-                    """
-                }
-            }
-        }
+                   // 3. Confirm running
+                   sh """
+                       sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} 'pgrep -f ${JAR_NAME} && echo started || echo failed'
+                   """
+               }
+           }
+       }
 
 
 
