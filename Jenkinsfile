@@ -86,23 +86,24 @@ pipeline {
                           // 1. Kill old process
                           sh """
                               sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                              "pkill -f ${JAR_NAME} || echo no-process"
+                              pkill -f ${JAR_NAME} || echo no-process
                           """
 
                           // 2. Start new process
                           sh """
                               sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                              "nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} > ${DEPLOY_DIR}/app.log 2>&1 &"
+                              nohup java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} > ${DEPLOY_DIR}/app.log 2>&1 &
                           """
 
                           // 3. Confirm running
                           sh """
                               sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                              "pgrep -f ${JAR_NAME} && echo started || echo failed"
+                              pgrep -f ${JAR_NAME} && echo started || echo failed
                           """
                       }
                   }
               }
+
 
 
 
