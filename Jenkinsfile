@@ -100,14 +100,24 @@ pipeline {
                             chmod -R 777 ${DEPLOY_DIR}
                         '''
 
-                        // 3. Start new process with global.env
+                        // 3. Create startup script on VPS
                         sh '''
-                            sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "cd ${DEPLOY_DIR} && echo 'Loading global environment...' && \
-                            nohup bash -c 'source ${GLOBAL_ENV} && java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT}' >> ${DEPLOY_DIR}/app.log 2>&1 &"
+                            sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "cat > ${DEPLOY_DIR}/start.sh << 'EOF'
+                            #!/bin/bash
+                            source ${GLOBAL_ENV}
+                            java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
+                            EOF
+                            chmod +x ${DEPLOY_DIR}/start.sh"
                         '''
 
-                        // 4. Confirm running
+                        // 4. Start new process using the script
+                        sh '''
+                            sshpass -p "$SSH_PASS" ssh -n -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                            "nohup ${DEPLOY_DIR}/start.sh &" < /dev/null
+                        '''
+
+                        // 5. Confirm running
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
                             pgrep -f "icsQuizUserService" && echo started || echo failed
