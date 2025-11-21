@@ -97,9 +97,9 @@ pipeline {
                         // 2. Fix directory permissions BEFORE starting app
                         sh '''
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "chmod -R 755 ${DEPLOY_DIR} && \
-                            chmod 644 ${DEPLOY_DIR}/*.jar && \
-                            chmod 644 ${DEPLOY_DIR}/*.sh"
+                            "chmod -R 755 ${DEPLOY_DIR}; \
+                            chmod 644 ${DEPLOY_DIR}/*.jar 2>/dev/null || true; \
+                            chmod 644 ${DEPLOY_DIR}/*.sh 2>/dev/null || true"
                         '''
 
                         // 3. Create startup script on VPS
