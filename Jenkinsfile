@@ -5,8 +5,8 @@ pipeline {
     }
 
     environment {
-        PROD_HOST  = credentials('DO_HOST')
-        PROD_USER  = credentials('DO_USER')
+        PROD_HOST  = "root"
+        PROD_USER  = "159.89.172.251"
         DEPLOY_DIR = '/www/wwwroot/CITSNVN/icsQuizUserService'
         PORT       = '3090'
     }
