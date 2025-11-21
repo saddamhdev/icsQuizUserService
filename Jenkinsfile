@@ -102,15 +102,17 @@ pipeline {
 
                         // 3. Create startup script on VPS
                         sh '''
-                            sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << 'SCRIPT'
+                            sshpass -p "$SSH_PASS" ssh -T -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} << SCRIPT
 echo "📝 Creating startup script..."
-cat > ${DEPLOY_DIR}/start.sh << 'EOF'
+cat > /www/wwwroot/CITSNVN/icsQuizUserService/start.sh << 'EOF'
 #!/bin/bash
-source ${GLOBAL_ENV}
-java -jar ${DEPLOY_DIR}/${JAR_NAME} --server.port=${PORT} >> ${DEPLOY_DIR}/app.log 2>&1
+source /www/wwwroot/CITSNVN/global.env
+java -jar /www/wwwroot/CITSNVN/icsQuizUserService/${JAR_NAME} --server.port=3090 >> /www/wwwroot/CITSNVN/icsQuizUserService/app.log 2>&1
 EOF
-chmod +x ${DEPLOY_DIR}/start.sh
-echo "✅ Startup script created at ${DEPLOY_DIR}/start.sh"
+chmod 755 /www/wwwroot/CITSNVN/icsQuizUserService/start.sh
+touch /www/wwwroot/CITSNVN/icsQuizUserService/app.log
+chmod 666 /www/wwwroot/CITSNVN/icsQuizUserService/app.log
+echo "✅ Startup script created at /www/wwwroot/CITSNVN/icsQuizUserService/start.sh"
 SCRIPT
                         '''
 
@@ -133,7 +135,7 @@ SCRIPT
                         sh '''
                             echo "📋 Last 20 lines of application log:"
                             sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                            "tail -20 ${DEPLOY_DIR}/app.log"
+                            "tail -20 ${DEPLOY_DIR}/app.log || echo 'Log file will be created on first run'"
                         '''
                     }
                 }
