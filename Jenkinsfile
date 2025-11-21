@@ -66,12 +66,12 @@ pipeline {
                                                 usernameVariable: 'SSH_USER',
                                                 passwordVariable: 'SSH_PASS')]) {
 
-                   sh '''
+                   sh """
                        echo "📤 Uploading JAR to server..."
 
                        sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
                            target/${JAR_NAME} ${PROD_USER}@${PROD_HOST}:${DEPLOY_DIR}/${JAR_NAME}
-                   '''
+                   """
                }
            }
        }
