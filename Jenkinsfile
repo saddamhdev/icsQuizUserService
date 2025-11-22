@@ -57,7 +57,7 @@ pipeline {
                         sh """
                             echo "📦 Uploading Kubernetes YAML files to VPS..."
                             sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
-                                k8s/icsquiz-user-app.yaml \
+                                k8s/icsquiz-user-app.yml \
                                 k8s/hpa.yaml \
                                 ${PROD_USER}@${PROD_HOST}:${APP_DIR}/
                         """
