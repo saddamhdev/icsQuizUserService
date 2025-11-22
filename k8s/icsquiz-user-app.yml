@@ -17,12 +17,24 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 3090
+
           envFrom:
             - configMapRef:
                 name: global-config
+
           env:
             - name: SERVER_PORT
               value: "3090"
+
+          # 🚀 Added required CPU & Memory requests/limits for HPA to work
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+
 ---
 apiVersion: v1
 kind: Service
