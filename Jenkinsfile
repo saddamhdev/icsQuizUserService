@@ -35,6 +35,18 @@ pipeline {
                 echo "JAR Detected: ${env.JAR_NAME}"
             }
         }
+            stage('Upload Dockerfile to VPS') {
+                steps {
+                    withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
+                                                     usernameVariable: 'SSH_USER',
+                                                     passwordVariable: 'SSH_PASS')]) {
+                        sh """
+                           sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
+                           Dockerfile ${PROD_USER}@${PROD_HOST}:${APP_DIR}/Dockerfile
+                        """
+                    }
+                }
+            }
 
         stage('Upload JAR to VPS') {
             steps {
