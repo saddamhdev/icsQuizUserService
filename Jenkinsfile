@@ -97,6 +97,22 @@ pipeline {
                 }
             }
         }
+        stage('Load Image into k3s') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'DO_SSH_PASSWORD',
+                                                 usernameVariable: 'SSH_USER',
+                                                 passwordVariable: 'SSH_PASS')]) {
+                    sh """
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} "
+                            cd ${APP_DIR} &&
+                            docker save icsquiz-user-app:latest -o userapp.tar &&
+                            k3s ctr images import userapp.tar
+                        "
+                    """
+                }
+            }
+        }
+
 
         stage('Apply Kubernetes YAML') {
             steps {
