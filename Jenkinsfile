@@ -108,7 +108,7 @@ pipeline {
                     sh """
                         echo "📄 Applying Kubernetes Deployment & Service..."
                         sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                        "kubectl apply -f ${APP_DIR}/icsquiz-user-app.yaml; \
+                        "kubectl apply -f ${APP_DIR}/icsquiz-user-app.yml; \
                          kubectl apply -f ${APP_DIR}/hpa.yaml"
                     """
                 }
