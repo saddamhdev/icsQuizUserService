@@ -47,6 +47,24 @@ pipeline {
                     }
                 }
             }
+            stage('Upload Kubernetes YAML to VPS') {
+                steps {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'DO_SSH_PASSWORD',
+                        usernameVariable: 'SSH_USER',
+                        passwordVariable: 'SSH_PASS'
+                    )]) {
+                        sh """
+                            echo "📦 Uploading Kubernetes YAML files to VPS..."
+                            sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
+                                k8s/icsquiz-user-app.yaml \
+                                k8s/hpa.yaml \
+                                ${PROD_USER}@${PROD_HOST}:${APP_DIR}/
+                        """
+                    }
+                }
+            }
+
 
         stage('Upload JAR to VPS') {
             steps {
