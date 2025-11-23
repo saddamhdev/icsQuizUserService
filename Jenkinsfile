@@ -147,6 +147,33 @@ pipeline {
                 }
             }
         }
+
+        stage('Port Forwarding') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'DO_SSH_PASSWORD',
+                    usernameVariable: 'SSH_USER',
+                    passwordVariable: 'SSH_PASS'
+                )]) {
+                    sh """
+                        echo "🔌 Setting up Kubernetes Port Forwarding..."
+
+                        # kill previous port-forward
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} "
+                            pkill -f 'kubectl port-forward svc/icsquiz-user-service' || true
+                        "
+
+                        # start new port forward in background
+                        sshpass -p "$SSH_PASS" ssh -f -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} "
+                            nohup kubectl port-forward svc/icsquiz-user-service 30090:3090 --address 0.0.0.0 > portforward.log 2>&1 &
+                        "
+
+                        echo "🎯 Port forwarding active: http://${PROD_HOST}:30090"
+                    """
+                }
+            }
+        }
+
     }
 
     post {
