@@ -72,15 +72,14 @@ pipeline {
                         passwordVariable: 'SSH_PASS'
                     )]) {
                         sh """
-                            echo "📦 Uploading Ingress YAML file to VPS..."
+                            echo "📦 Uploading Ingress file..."
                             sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
-                                k8s/ingress.yml \
-                                ${PROD_USER}@${PROD_HOST}:${APP_DIR}/ingress.yml
+                            k8s/icsquiz-user-ingress.yaml \
+                            ${PROD_USER}@${PROD_HOST}:${APP_DIR}/icsquiz-user-ingress.yaml
                         """
                     }
                 }
             }
-
 
 
         stage('Upload JAR to VPS') {
@@ -147,21 +146,24 @@ pipeline {
                 }
             }
         }
-        stage('Apply Ingress') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'DO_SSH_PASSWORD',
-                    usernameVariable: 'SSH_USER',
-                    passwordVariable: 'SSH_PASS'
-                )]) {
-                    sh """
-                        echo "🌐 Applying Ingress Resource..."
-                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
-                        "kubectl apply -f ${APP_DIR}/ingress.yml"
-                    """
-                }
-            }
-        }
+      
+
+       stage('Apply Ingress') {
+           steps {
+               withCredentials([usernamePassword(
+                   credentialsId: 'DO_SSH_PASSWORD',
+                   usernameVariable: 'SSH_USER',
+                   passwordVariable: 'SSH_PASS'
+               )]) {
+                   sh """
+                       echo "🌍 Applying Ingress..."
+                       sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                       "kubectl apply -f ${APP_DIR}/icsquiz-user-ingress.yaml"
+                   """
+               }
+           }
+       }
+
 
 
         stage('Restart Deployment in Kubernetes') {
