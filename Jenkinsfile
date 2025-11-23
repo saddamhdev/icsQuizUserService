@@ -64,6 +64,23 @@ pipeline {
                     }
                 }
             }
+            stage('Upload Ingress YAML to VPS') {
+                steps {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'DO_SSH_PASSWORD',
+                        usernameVariable: 'SSH_USER',
+                        passwordVariable: 'SSH_PASS'
+                    )]) {
+                        sh """
+                            echo "📦 Uploading Ingress YAML file to VPS..."
+                            sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
+                                k8s/ingress.yml \
+                                ${PROD_USER}@${PROD_HOST}:${APP_DIR}/ingress.yml
+                        """
+                    }
+                }
+            }
+
 
 
         stage('Upload JAR to VPS') {
@@ -130,6 +147,22 @@ pipeline {
                 }
             }
         }
+        stage('Apply Ingress') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'DO_SSH_PASSWORD',
+                    usernameVariable: 'SSH_USER',
+                    passwordVariable: 'SSH_PASS'
+                )]) {
+                    sh """
+                        echo "🌐 Applying Ingress Resource..."
+                        sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_HOST} \
+                        "kubectl apply -f ${APP_DIR}/ingress.yml"
+                    """
+                }
+            }
+        }
+
 
         stage('Restart Deployment in Kubernetes') {
             steps {
@@ -148,7 +181,7 @@ pipeline {
             }
         }
 
-       
+
     }
 
     post {
