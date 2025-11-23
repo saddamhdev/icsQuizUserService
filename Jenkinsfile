@@ -146,7 +146,7 @@ pipeline {
                 }
             }
         }
-      
+
 
        stage('Apply Ingress') {
            steps {
