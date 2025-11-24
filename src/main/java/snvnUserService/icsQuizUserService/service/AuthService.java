@@ -22,50 +22,43 @@ public class AuthService {
     private  StagingUserRepository stagingRepo;
     @Autowired
     private  UserRepository userRepo;
+    @Autowired
+    private  ReactiveRedisTemplate<String, User> reactiveRedisTemplate;
 
     public Mono<User> authenticate(Long userId, String password) {
         String redisKey = "user:" + userId;
 
-        return redisTemplate.opsForValue()
+        return reactiveRedisTemplate
+                .opsForValue()
                 .get(redisKey)
-                .log("🔍 RedisLookup")
                 .flatMap(cachedUser -> {
-                    if (cachedUser != null && password.equals(cachedUser.getPassword())) { // ✅ Plain match
-                        System.out.println("✅ Found in Redis: " + cachedUser.getName());
-                        return Mono.just(cachedUser);
+                    if (cachedUser != null && cachedUser.getPassword().equals(password)) {
+                        return Mono.just(cachedUser); // FAST PATH 🚀
                     }
-                    System.out.println("ℹ️ Not found or password mismatch in Redis");
                     return Mono.empty();
                 })
                 .switchIfEmpty(
                         stagingRepo.findByUserId(userId)
                                 .next()
-                                .log("🔍 StagingLookup")
                                 .flatMap(stagingUser -> {
-                                    System.out.println("➡️ Staging user found: " + stagingUser);
-                                    if (password.equals(stagingUser.getPasswordPlain())) { // ✅ Plain match
-                                        System.out.println("✅ Password matched in Staging Table");
-                                        User user = new User();
-                                        user.setUserId(stagingUser.getUserId());
-                                        user.setName(stagingUser.getName());
-                                        user.setCodeNumber(stagingUser.getCodeNumber());
-                                        user.setPassword(stagingUser.getPasswordPlain());
-                                        return Mono.just(user);
-                                    } else {
-                                        System.out.println("❌ Password mismatch in Staging Table");
-                                        return Mono.empty();
+                                    if (password.equals(stagingUser.getPasswordPlain())) {
+
+                                        // cache into redis for next time
+                                        User user = new User(
+                                                stagingUser.getUserId(),
+                                                stagingUser.getName(),
+                                                stagingUser.getCodeNumber(),
+                                                stagingUser.getPasswordPlain()
+                                        );
+
+                                        return reactiveRedisTemplate.opsForValue()
+                                                .set(redisKey, user)
+                                                .thenReturn(user);
                                     }
+                                    return Mono.empty();
                                 })
                 )
-                // Retry logic: Retry for 3 to 5 times on failure
-                .retryWhen(Retry.fixedDelay(15, Duration.ofSeconds(3)) // retry 5 times with 2 seconds delay
-                        .filter(e -> e instanceof RuntimeException))  // Only retry on specific exception types
-                .doOnSubscribe(sub -> System.out.println("🚀 Authenticating userId: " + userId))
-                .doOnSuccess(u -> {
-                    if (u != null) System.out.println("✅ Authentication Success for " + u.getName());
-                })
-                .doOnError(err -> System.out.println("💥 Error: " + err.getMessage()))
-                .doOnTerminate(() -> System.out.println("🏁 Authentication flow completed"))
-                .switchIfEmpty(Mono.error(new RuntimeException("❌ Invalid credentials")));
+                .switchIfEmpty(Mono.error(new RuntimeException("Invalid credentials")));
     }
+
 }
