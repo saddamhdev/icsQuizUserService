@@ -59,6 +59,10 @@ public class AuthController {
                     return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorBody));
                 });
     }
+    @PostMapping("/login1")
+    public Mono<ResponseEntity<Map<String, Object>>> login1(@RequestBody LoginRequest request) {
+        return Mono.just(ResponseEntity.ok(Map.of("success", true)));
+    }
 
 
 }
